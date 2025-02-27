@@ -1,7 +1,6 @@
-#define UNICDOE
 #include <windows.h>
 #include <strsafe.h>
-#define CLASS_NAME		TEXT("ColorFromPoint")
+#define CLASS_NAME		L"ColorFromPoint"
 #define WM_CHANGEFOCUS	WM_USER+1
 #define WM_MOUSEHOOK	WM_USER+321
 #define WM_KEYBOARDHOOK	WM_USER+123
@@ -13,6 +12,7 @@
 #define IDC_EDSTART		1025
 #define IDC_LBSTART		2049
 #define IDM_PROGRAM		4097
+#define IDM_LINE		4098
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK EditProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam);
@@ -25,9 +25,9 @@ bool IsColorDark(COLORREF color);
 BOOL DrawBitmap(HDC hdc, int x, int y, HBITMAP hBitmap);
 void ErrorMessage(LPCTSTR msg, ...);
 
-int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int nCmdShow){
+int APIENTRY wWinMain(HINSTANCE hInst, HINSTANCE, LPWSTR, int nCmdShow){
 	HANDLE hMutex;
-	hMutex = CreateMutex(NULL, FALSE, TEXT("MyColorFromPointMutex"));
+	hMutex = CreateMutex(NULL, FALSE, L"MyColorFromPointMutex");
 
 	if(GetLastError() == ERROR_ALREADY_EXISTS){
 		CloseHandle(hMutex);
@@ -117,10 +117,14 @@ HBRUSH CreateCMYKBrush(MyCMYK cmyk);
 void ToHex(MyCMYK cmyk, LPTSTR ret, int Size);
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam){
-	const char		*MyDll				= "MyApiDll.dll",
-					*MyMouseProc		= "MyMouseProc",
-					*MyKeyboardProc		= "MyKeyboardProc",
-					*MyUtil				= "MyInit";
+	const wchar_t	*wMyDll				= L"MyApiDll.dll",
+					*wMyMouseProc		= L"MyMouseProc",
+					*wMyKeyboardProc	= L"MyKeyboardProc",
+					*wMyUtil			= L"MyInit";
+	char			mMyDll[50],
+					mMyMouseProc[50],
+					mMyKeyboardProc[50],
+					mMyUtil[50];
 	static HDC		g_hScreenDC			= NULL;
 	static RECT		g_rcMagnify			= {0,},
 					g_rcRed				= {0,},
@@ -160,6 +164,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 	static COLORREF SelectColor, EllipseColor;
 	static POINT Mouse, EllipseOrigin;
 	static HPEN hWhitePen, hBlackPen;
+	static BOOL bLine;
 
 	void (*pInit)(HWND, HHOOK, HHOOK)	= NULL;
 
@@ -171,7 +176,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 	COLORREF	color;
 	TCHAR		HexCode[6];
 	HMONITOR	hCurrentMonitor;
-	int x, y, Width, iWidth, Height, iHeight, iRadius;
+	int x, y, Width, iWidth, Height, iHeight, iRadius, ConvertLength;
 
 	WNDCLASS wc;
 	HDC hdc;
@@ -181,27 +186,33 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 	switch(iMessage){
 		case WM_CREATE:
 			try{
-				g_hModule = LoadLibrary(MyDll);
+				g_hModule = LoadLibrary(wMyDll);
 				if(g_hModule == NULL){ throw 1; }
 
-				g_lpfnMouseProc = (HOOKPROC)GetProcAddress(g_hModule, MyMouseProc);
+				ConvertLength = WideCharToMultiByte(CP_ACP, 0, wMyMouseProc, -1, NULL, 0, NULL, NULL);
+				WideCharToMultiByte(CP_ACP, 0, wMyMouseProc, -1, mMyMouseProc, ConvertLength, NULL, NULL);
+				g_lpfnMouseProc = (HOOKPROC)GetProcAddress(g_hModule, mMyMouseProc);
 				if(g_lpfnMouseProc == NULL){ throw 2; }
 
 				g_hMouse = SetWindowsHookEx(WH_MOUSE_LL, g_lpfnMouseProc,g_hModule, 0);
 				if(g_hMouse == NULL){ throw 3; }
 
-				g_lpfnKeyboardProc = (HOOKPROC)GetProcAddress(g_hModule, MyKeyboardProc);
+				ConvertLength = WideCharToMultiByte(CP_ACP, 0, wMyKeyboardProc, -1, NULL, 0, NULL, NULL);
+				WideCharToMultiByte(CP_ACP, 0, wMyKeyboardProc, -1, mMyKeyboardProc, ConvertLength, NULL, NULL);
+				g_lpfnKeyboardProc = (HOOKPROC)GetProcAddress(g_hModule, mMyKeyboardProc);
 				if(g_lpfnKeyboardProc == NULL){ throw 4; }
 
 				g_hKeyboard = SetWindowsHookEx(WH_KEYBOARD_LL, g_lpfnKeyboardProc,g_hModule, 0);
 				if(g_hKeyboard == NULL){ throw 5; }
 
-				pInit = (void (*)(HWND, HHOOK, HHOOK))GetProcAddress(g_hModule, MyUtil);
+				ConvertLength = WideCharToMultiByte(CP_ACP, 0, wMyUtil, -1, NULL, 0, NULL, NULL);
+				WideCharToMultiByte(CP_ACP, 0, wMyUtil, -1, mMyUtil, ConvertLength, NULL, NULL);
+				pInit = (void (*)(HWND, HHOOK, HHOOK))GetProcAddress(g_hModule, mMyUtil);
 				if(pInit == NULL){ throw 6; }
 				(*pInit)(hWnd, g_hMouse, g_hKeyboard);
 
 			} catch (const int err){
-				ErrorMessage(TEXT("Init Failed"));
+				ErrorMessage(L"Init Failed");
 				if(err != 1){
 					FreeLibrary(g_hModule);
 				}
@@ -210,26 +221,26 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 
 			SetRect(&g_rcMagnify, 0,0, 100, 100);
 
-			color = ToCOLORREF(TEXT("#c92519"));
+			color = ToCOLORREF(L"#c92519");
 			hRedBrush = CreateSolidBrush(color);
-			color = ToCOLORREF(TEXT("#00A86B"));
+			color = ToCOLORREF(L"#00A86B");
 			hGreenBrush = CreateSolidBrush(color);
-			color = ToCOLORREF(TEXT("#0080ff"));
+			color = ToCOLORREF(L"#0080ff");
 			hBlueBrush = CreateSolidBrush(color);
 			hBlackBrush = CreateSolidBrush(RGB(54, 69, 79));
 
-			GetClassInfo(NULL, TEXT("edit"), &wc);
+			GetClassInfo(NULL, L"edit", &wc);
 			wc.hInstance		= GetModuleHandle(NULL);
-			wc.lpszClassName	= TEXT("MyEditClass");
+			wc.lpszClassName	= L"MyEditClass";
 			OldEditProc			= wc.lpfnWndProc;
 			wc.lpfnWndProc		= (WNDPROC)EditProc;
 			RegisterClass(&wc);
-			SetProp(hWnd, TEXT("MyEditClassProc"), (HANDLE)OldEditProc);
+			SetProp(hWnd, L"MyEditClassProc", (HANDLE)OldEditProc);
 			for(int i=0; i<nEdit; i++){
-				hControls[i] = CreateWindowEx(WS_EX_CLIENTEDGE, TEXT("MyEditClass"), TEXT(""), WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL | ES_RIGHT | ES_READONLY, 0,0,0,0, hWnd, (HMENU)(INT_PTR)(IDC_EDSTART + i), GetModuleHandle(NULL), NULL);
+				hControls[i] = CreateWindowEx(WS_EX_CLIENTEDGE, L"MyEditClass", TEXT(""), WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL | ES_RIGHT | ES_READONLY, 0,0,0,0, hWnd, (HMENU)(INT_PTR)(IDC_EDSTART + i), GetModuleHandle(NULL), NULL);
 			}
 
-			hControls[nControls - 1]= CreateWindowEx(WS_EX_CLIENTEDGE, TEXT("listbox"), NULL, WS_CHILD | WS_VISIBLE | WS_BORDER | WS_VSCROLL | LBS_NOTIFY | LBS_OWNERDRAWFIXED, 0,0,0,0, hWnd, (HMENU)IDC_LBSTART, GetModuleHandle(NULL), NULL);
+			hControls[nControls - 1]= CreateWindowEx(WS_EX_CLIENTEDGE, L"listbox", NULL, WS_CHILD | WS_VISIBLE | WS_BORDER | WS_VSCROLL | LBS_NOTIFY | LBS_OWNERDRAWFIXED, 0,0,0,0, hWnd, (HMENU)(INT_PTR)IDC_LBSTART, GetModuleHandle(NULL), NULL);
 
 			g_hScreenDC = GetDC(NULL);
 			g_hScreenMemDC = CreateCompatibleDC(g_hScreenDC);
@@ -240,10 +251,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 			hBlackPen = CreatePen(PS_SOLID, 1, RGB(0,0,0));
 			ReleaseDC(hWnd, hdc);
 
+			bLine = FALSE;
+
 			hMenu                   = CreateMenu();
 			hPopupMenu              = CreatePopupMenu();
-			AppendMenu(hMenu, MF_STRING | MF_POPUP, (UINT_PTR)hPopupMenu, TEXT("메뉴(&Menu)"));
-			AppendMenu(hPopupMenu, MF_STRING, IDM_PROGRAM, TEXT("프로그램 소개"));
+			AppendMenu(hMenu, MF_STRING | MF_POPUP, (UINT_PTR)hPopupMenu, L"메뉴(&Menu)");
+			AppendMenu(hPopupMenu, MF_STRING, IDM_PROGRAM, L"프로그램 소개");
+			AppendMenu(hPopupMenu, MF_STRING | MF_UNCHECKED, IDM_LINE, L"보조선");
 			SetMenu(hWnd, hMenu);
 
 			SetTimer(hWnd, 1, 10, NULL);
@@ -378,6 +392,36 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 							{
 								int idx	= SendMessage(hControls[nControls - 1], LB_GETCURSEL, 0,0);
 								EllipseColor = (COLORREF)SendMessage(hControls[nControls - 1], LB_GETITEMDATA, idx, 0);
+
+								int r = GetRValue(SelectColor),
+									g = GetGValue(SelectColor),
+									b = GetBValue(SelectColor);
+
+								memset(HexCode, 0, sizeof(HexCode));
+								MyCMYK cmyk = ToCMYK(r,g,b);
+								StringCbPrintf(HexCode, sizeof(HexCode), L"%.2f", cmyk.C);
+								SetDlgItemText(hWnd, IDC_EDSTART, HexCode);
+
+								StringCbPrintf(HexCode, sizeof(HexCode), L"%.2f", cmyk.M);
+								SetDlgItemText(hWnd, IDC_EDSTART+1, HexCode);
+
+								StringCbPrintf(HexCode, sizeof(HexCode), L"%.2f", cmyk.Y);
+								SetDlgItemText(hWnd, IDC_EDSTART+2, HexCode);
+
+								StringCbPrintf(HexCode, sizeof(HexCode), L"%.2f", cmyk.K);
+								SetDlgItemText(hWnd, IDC_EDSTART+9, HexCode);
+								
+								SetDlgItemInt(hWnd, IDC_EDSTART+3, r, FALSE);
+								SetDlgItemInt(hWnd, IDC_EDSTART+4, g, FALSE);
+								SetDlgItemInt(hWnd, IDC_EDSTART+5, b, FALSE);
+
+								ToHex(r, HexCode, sizeof(HexCode));
+								SetDlgItemText(hWnd, IDC_EDSTART+6, HexCode); 
+								ToHex(g, HexCode, sizeof(HexCode));
+								SetDlgItemText(hWnd, IDC_EDSTART+7, HexCode); 
+								ToHex(b, HexCode, sizeof(HexCode));
+								SetDlgItemText(hWnd, IDC_EDSTART+8, HexCode); 
+
 								InvalidateRect(hWnd, NULL, FALSE);
 							}
 							break;
@@ -385,8 +429,20 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 					break;
 
 				case IDM_PROGRAM:
-					MessageBox(hWnd, TEXT("프로그램 소개\r\n\r\n위 프로그램은 색상값 조사에 사용되는 도구입니다.\r\n마우스 커서가 위치한 지점에서 일정한 크기의 영역을 조사하여 이미지 정보를 가져옵니다.\r\n주로, 이미지에 대한 색상 정보를 조사할 때 사용되며 추후 버전이 업데이트 되어 기능이 추가될 수 있습니다.\r\n\r\n단축키\r\n1. Ctrl + Alt + 3 : 마우스 주변 영역을 캡처합니다. \r\n2. Ctrl + Alt + 4 : 마우스 커서가 위치한 지점의 색상값을 CMYK, RGB, HEX로 변환합니다.\r\n3. Alt + 마우스 휠 : 이미지를 확대하거나 축소할 수 있습니다.\r\n\r\n※ 참고\r\n색상값을 변환할 때 최근 변환한 색상을 리스트에 기록합니다.\r\n이는 저장되지 않으며, 색상을 선택하면 이미지에 색상을 적용하여 보여줍니다."), TEXT("ColorFromPoint"), MB_OK);
+					MessageBox(hWnd, L"프로그램 소개\r\n\r\n위 프로그램은 색상값 조사에 사용되는 도구입니다.\r\n마우스 커서가 위치한 지점에서 일정한 크기의 영역을 조사하여 이미지 정보를 가져옵니다.\r\n주로, 이미지에 대한 색상 정보를 조사할 때 사용되며 추후 버전이 업데이트 되어 기능이 추가될 수 있습니다.\r\n\r\n단축키\r\n1. Ctrl + Alt + 3 : 마우스 주변 영역을 캡처합니다. \r\n2. Ctrl + Alt + 4 : 마우스 커서가 위치한 지점의 색상값을 CMYK, RGB, HEX로 변환합니다.\r\n3. Alt + 마우스 휠 : 이미지를 확대하거나 축소할 수 있습니다.\r\n\r\n※ 참고\r\n색상값을 변환할 때 최근 변환한 색상을 리스트에 기록합니다.\r\n리스트에 기록된 색상을 선택하면 타원형 이미지에 색상을 적용하여 보여줍니다.\r\n\r\n첫 번째 열: CMYK\r\n두 번째 열: RGB\r\n세 번째 열: HEX", L"ColorFromPoint", MB_OK);
 					break;
+
+				case IDM_LINE:
+					bLine = !bLine;
+					break;
+			}
+			return 0;
+
+		case WM_INITMENU:
+			if(bLine){
+				CheckMenuItem(GetSubMenu((HMENU)wParam, 0), IDM_LINE, MF_BYCOMMAND | MF_CHECKED);
+			}else{
+				CheckMenuItem(GetSubMenu((HMENU)wParam, 0), IDM_LINE, MF_BYCOMMAND | MF_UNCHECKED);
 			}
 			return 0;
 
@@ -450,7 +506,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 
 						iWidth	= bmp.bmWidth;
 						iHeight	= bmp.bmHeight;
-						iRadius	= 3;
+						iRadius	= 2;
 
 						Origin.x = iWidth / 2;
 						Origin.y = iHeight / 2;
@@ -463,12 +519,20 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 						}else{
 							hOldPen	= (HPEN)SelectObject(g_hDrawMemDC, hBlackPen);
 						}
+
+						SelectColor = GetPixel(g_hDrawMemDC, Origin.x, Origin.y);
+
+						if(bLine){
+							MoveToEx(g_hDrawMemDC, 0, Origin.y, NULL);
+							LineTo(g_hDrawMemDC, iWidth, Origin.y);
+							MoveToEx(g_hDrawMemDC, Origin.x, 0, NULL);
+							LineTo(g_hDrawMemDC, Origin.x, iHeight);
+						}
+
 						HBRUSH hOldBrush = (HBRUSH)SelectObject(g_hDrawMemDC, (HBRUSH)GetStockObject(NULL_BRUSH));
 						Ellipse(g_hDrawMemDC, Origin.x - iRadius, Origin.y - iRadius, Origin.x + iRadius, Origin.y + iRadius);
 						SelectObject(g_hDrawMemDC, hOldBrush);
 						SelectObject(g_hDrawMemDC, hOldPen);
-
-						SelectColor = GetPixel(g_hDrawMemDC, Origin.x, Origin.y);
 
 						SelectObject(g_hDrawMemDC, hDrawOld);
 						SelectObject(g_hScreenMemDC, hScreenOld);
@@ -598,16 +662,16 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 
 												memset(HexCode, 0, sizeof(HexCode));
 												MyCMYK cmyk = ToCMYK(r,g,b);
-												StringCbPrintf(HexCode, sizeof(HexCode), TEXT("%.2f"), cmyk.C);
+												StringCbPrintf(HexCode, sizeof(HexCode), L"%.2f", cmyk.C);
 												SetDlgItemText(hWnd, IDC_EDSTART, HexCode);
 
-												StringCbPrintf(HexCode, sizeof(HexCode), TEXT("%.2f"), cmyk.M);
+												StringCbPrintf(HexCode, sizeof(HexCode), L"%.2f", cmyk.M);
 												SetDlgItemText(hWnd, IDC_EDSTART+1, HexCode);
 
-												StringCbPrintf(HexCode, sizeof(HexCode), TEXT("%.2f"), cmyk.Y);
+												StringCbPrintf(HexCode, sizeof(HexCode), L"%.2f", cmyk.Y);
 												SetDlgItemText(hWnd, IDC_EDSTART+2, HexCode);
 
-												StringCbPrintf(HexCode, sizeof(HexCode), TEXT("%.2f"), cmyk.K);
+												StringCbPrintf(HexCode, sizeof(HexCode), L"%.2f", cmyk.K);
 												SetDlgItemText(hWnd, IDC_EDSTART+9, HexCode);
 												
 												SetDlgItemInt(hWnd, IDC_EDSTART+3, r, FALSE);
@@ -773,8 +837,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 					SetClassLongPtr(hControls[i], GCLP_WNDPROC, (LONG_PTR)OldEditProc);
 				}
 			}
-			if(GetProp(hWnd, TEXT("MyEditClassProc")) != NULL){
-				RemoveProp(hWnd, TEXT("MyEditClassProc"));
+			if(GetProp(hWnd, L"MyEditClassProc") != NULL){
+				RemoveProp(hWnd, L"MyEditClassProc");
 			}
 			if(hRedBrush){ DeleteObject(hRedBrush); }
 			if(hGreenBrush){ DeleteObject(hGreenBrush); }
@@ -896,21 +960,21 @@ void ErrorMessage(LPCTSTR msg, ...){
 	DWORD dw = GetLastError(); 
 
 	if (FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, dw, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR) &lpMsgBuf, 0, NULL) == 0) {
-		MessageBox(HWND_DESKTOP, TEXT("DisplayText Error"), TEXT("Warning"), MB_OK);
+		MessageBox(HWND_DESKTOP, L"DisplayText Error", TEXT("Warning"), MB_OK);
 	}
 
 	TCHAR buf[256];
-	StringCbPrintf(buf, sizeof(buf), TEXT("[%s(%d)]%s"), msg, dw, lpMsgBuf);
-	MessageBox(HWND_DESKTOP, (LPCTSTR)buf, TEXT("Error"), MB_ICONWARNING | MB_OK);
+	StringCbPrintf(buf, sizeof(buf), L"[%s(%d)]%s", msg, dw, lpMsgBuf);
+	MessageBox(HWND_DESKTOP, (LPCTSTR)buf, L"Error", MB_ICONWARNING | MB_OK);
 	LocalFree(lpMsgBuf);
 }
 
 void ToHex(COLORREF color, LPTSTR ret, int Size){
-	StringCbPrintf(ret, Size, TEXT("%02X%02X%02X"), GetRValue(color), GetGValue(color), GetBValue(color));
+	StringCbPrintf(ret, Size, L"%02X%02X%02X", GetRValue(color), GetGValue(color), GetBValue(color));
 }
 
 void ToHex(int Value, LPTSTR ret, int Size){
-	StringCbPrintf(ret, Size, TEXT("%02X"), Value);
+	StringCbPrintf(ret, Size, L"%02X", Value);
 }
 
 COLORREF ToCOLORREF(LPCTSTR HexCode){
@@ -1058,7 +1122,7 @@ HBRUSH CreateCMYKBrush(MyCMYK cmyk){
 
 void ToHex(MyCMYK cmyk, LPTSTR ret, int Size){
 	COLORREF color = ToCOLORREF(cmyk);
-	StringCbPrintf(ret, Size, TEXT("%02X%02X%02X"), GetRValue(color), GetGValue(color), GetBValue(color));
+	StringCbPrintf(ret, Size, L"%02X%02X%02X", GetRValue(color), GetGValue(color), GetBValue(color));
 }
 
 LRESULT CALLBACK EditProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam){
@@ -1066,7 +1130,7 @@ LRESULT CALLBACK EditProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam
 	static WNDPROC OldEditProc;
 
 	if(OldEditProc == NULL){
-		OldEditProc = (WNDPROC)GetProp(GetParent(hWnd), TEXT("MyEditClassProc"));
+		OldEditProc = (WNDPROC)GetProp(GetParent(hWnd), L"MyEditClassProc");
 	}
 
 	switch(iMessage){

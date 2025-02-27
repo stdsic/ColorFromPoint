@@ -1,4 +1,3 @@
-#define UNICODE
 #include <windows.h>
 #define SHARED	__attribute__((section(".mhdata"), shared))
 

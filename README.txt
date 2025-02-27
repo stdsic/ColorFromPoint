@@ -1,3 +1,10 @@
+:English
+This is a Windows-only program.
+
+ColorFromPoint, as the name suggests, is used to investigate color information at the point where the mouse cursor is located.
+Since it works using low-level technology included in the operating system, it does not take into account the unique gamma value or weight of each site, such as web browsers.
+
+:Korean
 이 프로그램은 Windows 전용 프로그램입니다.
 
 ColorFromPoint는 이름에서도 알 수 있듯, 마우스 커서가 위치한 지점에서 색상 정보를 조사하기 위해 사용됩니다.
