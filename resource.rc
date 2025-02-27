@@ -1,0 +1,43 @@
+#include <windows.h>
+
+#ifdef _WIN32
+LANGUAGE 0x0412, 0x01
+#pragma code_page(65001)
+#endif
+
+#define VERSION_MAJOR 1
+#define VERSION_MINOR 0
+#define VERSION_BUILD 1
+#define VERSION_PATCH 1
+
+#define STR(str) #str
+#define TOVERSION(major, minor, build, patch) STR(major.minor.build.patch)
+#define FULLVERSION TOVERSION(VERSION_MAJOR, VERSION_MINOR, VERSION_BUILD, VERSION_PATCH)
+
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION	VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH, VERSION_BUILD
+PRODUCTVERSION VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH, VERSION_BUILD
+FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
+FILEOS VOS__WINDOWS32
+FILETYPE VFT_APP
+FILESUBTYPE VFT_UNKNOWN
+BEGIN
+	BLOCK "StringFileInfo"
+	BEGIN
+		BLOCK "041204B0"
+		BEGIN
+			VALUE "ProductName", "ColorFromPoint.exe"
+			VALUE "LegalCopyright", ""
+			VALUE "FileVersion", FULLVERSION
+			VALUE "ProductVersion", FULLVERSION
+			VALUE "FileDescription", "컬러 픽커"
+			VALUE "OriginalFileName", "ColorFromPoint.exe"
+			VALUE "InternalName", "ColorFromPoint"
+			VALUE "CompanyName", "stdsic"
+		END
+	END
+	BLOCK "VarFileInfo"
+	BEGIN
+		VALUE "Translation", 0x0412, 1200
+	END
+END
