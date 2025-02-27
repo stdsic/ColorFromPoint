@@ -656,35 +656,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 									case 0x34:
 										if(GetKeyState(VK_CONTROL) & 0x8000 && GetKeyState(VK_MENU) & 0x8000){
 											if(g_hDrawBitmap){
-												int r = GetRValue(SelectColor),
-													g = GetGValue(SelectColor),
-													b = GetBValue(SelectColor);
-
-												memset(HexCode, 0, sizeof(HexCode));
-												MyCMYK cmyk = ToCMYK(r,g,b);
-												StringCbPrintf(HexCode, sizeof(HexCode), L"%.2f", cmyk.C);
-												SetDlgItemText(hWnd, IDC_EDSTART, HexCode);
-
-												StringCbPrintf(HexCode, sizeof(HexCode), L"%.2f", cmyk.M);
-												SetDlgItemText(hWnd, IDC_EDSTART+1, HexCode);
-
-												StringCbPrintf(HexCode, sizeof(HexCode), L"%.2f", cmyk.Y);
-												SetDlgItemText(hWnd, IDC_EDSTART+2, HexCode);
-
-												StringCbPrintf(HexCode, sizeof(HexCode), L"%.2f", cmyk.K);
-												SetDlgItemText(hWnd, IDC_EDSTART+9, HexCode);
-												
-												SetDlgItemInt(hWnd, IDC_EDSTART+3, r, FALSE);
-												SetDlgItemInt(hWnd, IDC_EDSTART+4, g, FALSE);
-												SetDlgItemInt(hWnd, IDC_EDSTART+5, b, FALSE);
-
-												ToHex(r, HexCode, sizeof(HexCode));
-												SetDlgItemText(hWnd, IDC_EDSTART+6, HexCode); 
-												ToHex(g, HexCode, sizeof(HexCode));
-												SetDlgItemText(hWnd, IDC_EDSTART+7, HexCode); 
-												ToHex(b, HexCode, sizeof(HexCode));
-												SetDlgItemText(hWnd, IDC_EDSTART+8, HexCode); 
-
 												SendMessage(hControls[nControls-1], LB_INSERTSTRING, 0, (LPARAM)SelectColor);
 											}
 										}
