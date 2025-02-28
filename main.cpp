@@ -391,11 +391,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 						case LBN_SELCHANGE:
 							{
 								int idx	= SendMessage(hControls[nControls - 1], LB_GETCURSEL, 0,0);
+								if(idx == LB_ERR){ return 0; }
 								EllipseColor = (COLORREF)SendMessage(hControls[nControls - 1], LB_GETITEMDATA, idx, 0);
 
-								int r = GetRValue(SelectColor),
-									g = GetGValue(SelectColor),
-									b = GetBValue(SelectColor);
+								int r = GetRValue(EllipseColor),
+									g = GetGValue(EllipseColor),
+									b = GetBValue(EllipseColor);
 
 								memset(HexCode, 0, sizeof(HexCode));
 								MyCMYK cmyk = ToCMYK(r,g,b);
