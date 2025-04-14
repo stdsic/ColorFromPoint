@@ -401,13 +401,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 								memset(HexCode, 0, sizeof(HexCode));
 								MyCMYK cmyk = ToCMYK(r,g,b);
 								StringCbPrintf(HexCode, sizeof(HexCode), L"%.2f", cmyk.C);
-								SetDlgItemText(hWnd, IDC_EDSTART, HexCode);
+								SetDlgItemText(hWnd, IDC_EDSTART + 2, HexCode);
 
 								StringCbPrintf(HexCode, sizeof(HexCode), L"%.2f", cmyk.M);
-								SetDlgItemText(hWnd, IDC_EDSTART+1, HexCode);
+								SetDlgItemText(hWnd, IDC_EDSTART, HexCode);
 
 								StringCbPrintf(HexCode, sizeof(HexCode), L"%.2f", cmyk.Y);
-								SetDlgItemText(hWnd, IDC_EDSTART+2, HexCode);
+								SetDlgItemText(hWnd, IDC_EDSTART+1, HexCode);
 
 								StringCbPrintf(HexCode, sizeof(HexCode), L"%.2f", cmyk.K);
 								SetDlgItemText(hWnd, IDC_EDSTART+9, HexCode);
