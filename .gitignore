@@ -1,6 +1,7 @@
 # ignore
 
 *.o
+*.rc
 *.res
 *.exe
 *.dll
