@@ -29,6 +29,8 @@ MyApiDll.dll<br>
 - stdsic — @https://github.com/stdsic/ColorFromPoint<br>
 <br><br>
 ## 📚 Version History<br>
+- 1.0.1<br>
+  - 메타 데이터 수정<br>
 - 1.0.0<br>
   - 최초 릴리스<br>
 <br><br>
