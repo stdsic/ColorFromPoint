@@ -10,11 +10,9 @@
 #ifdef __cplusplus
 extern "C"{
 #endif
-
 	MY_API void MyInit(HWND hWnd, HHOOK hMouse, HHOOK hKeyboard);
 	MY_API LRESULT CALLBACK MyMouseProc(int nCode, WPARAM wParam, LPARAM lParam);
 	MY_API LRESULT CALLBACK MyKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam);
-
 #ifdef __cplusplus
 }
 #endif
