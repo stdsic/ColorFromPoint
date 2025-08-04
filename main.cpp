@@ -1,3 +1,4 @@
+// #define _DEBUG
 #define _WIN32_WINNT 0x0A00
 #include <windows.h>
 #include <winspool.h>
@@ -35,8 +36,6 @@ int APIENTRY wWinMain(HINSTANCE hInst, HINSTANCE, LPWSTR, int nCmdShow){
 	HANDLE hMutex;
 	hMutex = CreateMutex(NULL, FALSE, L"MyColorFromPointMutex");
 
-    BOOL bConsole = AllocConsole();
-
 	if(GetLastError() == ERROR_ALREADY_EXISTS){
 		CloseHandle(hMutex);
 		HWND hOnce = FindWindow(CLASS_NAME, NULL);
@@ -46,6 +45,10 @@ int APIENTRY wWinMain(HINSTANCE hInst, HINSTANCE, LPWSTR, int nCmdShow){
 		}
 		return 0;
 	}
+
+#ifdef _DEBUG
+    AllocConsole();
+#endif
 
 	WNDCLASS wc = {
 		CS_HREDRAW | CS_VREDRAW,
@@ -88,8 +91,7 @@ int APIENTRY wWinMain(HINSTANCE hInst, HINSTANCE, LPWSTR, int nCmdShow){
 		DispatchMessage(&msg);
 	}
 
-    if(bConsole){ FreeConsole(); }
-
+    FreeConsole();
 	return (int)msg.wParam;
 }
 
@@ -1280,12 +1282,12 @@ MyCMYK ToCMYKFromICC(int r, int g, int b){
     }
 
     cmsColorSpaceSignature sig = cmsGetColorSpace(cmykProf);
-    // printf("ColorSpace Signature: %u (Hex: 0x%X)\n", sig, sig);
 
     if(sig == cmsSigCmykData){
         cmsHTRANSFORM transform = cmsCreateTransform(rgbProf, TYPE_RGB_8, cmykProf, TYPE_CMYK_8, INTENT_PERCEPTUAL, 0);
 
         if(!transform){
+            // DebugMessage(transform Is Null);
             cmsCloseProfile(rgbProf);
             cmsCloseProfile(cmykProf);
             return ret;
