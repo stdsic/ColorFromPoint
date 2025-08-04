@@ -1,2 +1,2 @@
-g++ -static-libgcc -static-libstdc++ -c -o main.o main.cpp -mwindows -municode
-g++ -static-libgcc -static-libstdc++ -o ColorFromPoint.exe -s main.o resource.o -mwindows -municode -L. -lMyApiDll
+g++ -static-libgcc -static-libstdc++ -c -o main.o main.cpp -lgdi32 -luser32 -lkernel32 -lmscms -lwinspool -municode -I C:\vcpkg\installed\x64-mingw-static\include -L C:\vcpkg\installed\x64-mingw-static\lib -llcms2
+g++ -static-libgcc -static-libstdc++ -o ColorFromPoint.exe -s main.o resource.o -lgdi32 -luser32 -lkernel32 -lmscms -lwinspool -municode -L. -lMyApiDll -I C:\vcpkg\installed\x64-mingw-static\include -L C:\vcpkg\installed\x64-mingw-static\lib -llcms2

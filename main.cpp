@@ -1,5 +1,10 @@
+#define _WIN32_WINNT 0x0A00
 #include <windows.h>
+#include <winspool.h>
 #include <strsafe.h>
+#include <math.h>
+#include <lcms2.h>
+#include <icm.h>
 #define CLASS_NAME		L"ColorFromPoint"
 #define WM_CHANGEFOCUS	WM_USER+1
 #define WM_MOUSEHOOK	WM_USER+321
@@ -24,10 +29,13 @@ COLORREF GetAverageColor(HDC hdc, int x, int y, int rad);
 bool IsColorDark(COLORREF color);
 BOOL DrawBitmap(HDC hdc, int x, int y, HBITMAP hBitmap);
 void ErrorMessage(LPCTSTR msg, ...);
+void DebugMessage(LPCWSTR fmt, ...);
 
 int APIENTRY wWinMain(HINSTANCE hInst, HINSTANCE, LPWSTR, int nCmdShow){
 	HANDLE hMutex;
 	hMutex = CreateMutex(NULL, FALSE, L"MyColorFromPointMutex");
+
+    BOOL bConsole = AllocConsole();
 
 	if(GetLastError() == ERROR_ALREADY_EXISTS){
 		CloseHandle(hMutex);
@@ -80,6 +88,8 @@ int APIENTRY wWinMain(HINSTANCE hInst, HINSTANCE, LPWSTR, int nCmdShow){
 		DispatchMessage(&msg);
 	}
 
+    if(bConsole){ FreeConsole(); }
+
 	return (int)msg.wParam;
 }
 
@@ -111,10 +121,15 @@ float MyGetKValue(MyRGB rgb);
 MyCMY GetCMY(MyRGB rgb, float K);
 MyCMYK ToCMYK(COLORREF color);
 MyCMYK ToCMYK(int r, int g, int b);
+MyCMYK ToCMYKFromICC(int r, int g, int b);
 MyRGB ToRGB(MyCMYK cmyk);
 COLORREF ToCOLORREF(MyCMYK cmyk);
 HBRUSH CreateCMYKBrush(MyCMYK cmyk);
 void ToHex(MyCMYK cmyk, LPTSTR ret, int Size);
+float LinearToSRGB(float Channel);
+MyRGB ConvertToSRGB(MyRGB rgb);
+float SRGBToLinear(float Channel);
+MyRGB ConvertToLinearRGB(MyRGB srgb);
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam){
 	const wchar_t	*wMyDll				= L"MyApiDll.dll",
@@ -561,21 +576,27 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 						DrawEdge(g_hMemDC, &g_rcBlue, EDGE_SUNKEN, BF_RECT);
 						DrawEdge(g_hMemDC, &g_rcBlack, EDGE_SUNKEN, BF_RECT);
 
+                        int BkMode = SetBkMode(g_hMemDC, TRANSPARENT);
 						CopyRect(&srt, &g_rcRed);
 						InflateRect(&srt, -EDGEFRAME, -EDGEFRAME);
 						FillRect(g_hMemDC, &srt, hRedBrush);
+                        DrawText(g_hMemDC, L"M", -1, &g_rcRed, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
 						CopyRect(&srt, &g_rcGreen);
 						InflateRect(&srt, -EDGEFRAME, -EDGEFRAME);
 						FillRect(g_hMemDC, &srt, hGreenBrush);
+                        DrawText(g_hMemDC, L"Y", -1, &g_rcGreen, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
 						CopyRect(&srt, &g_rcBlue);
 						InflateRect(&srt, -EDGEFRAME, -EDGEFRAME);
 						FillRect(g_hMemDC, &srt, hBlueBrush);
+                        DrawText(g_hMemDC, L"C", -1, &g_rcBlue, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
 						CopyRect(&srt, &g_rcBlack);
 						InflateRect(&srt, -EDGEFRAME, -EDGEFRAME);
 						FillRect(g_hMemDC, &srt, hBlackBrush);
+                        DrawText(g_hMemDC, L"K", -1, &g_rcBlack, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+                        SetBkMode(g_hMemDC, BkMode);
 
 						HBRUSH hEllipseBrush = CreateSolidBrush(EllipseColor),
 							   hEllipseOldBrush	= (HBRUSH)SelectObject(g_hMemDC, hEllipseBrush);
@@ -1081,8 +1102,8 @@ COLORREF ToCOLORREF(MyCMYK cmyk){
 	MyRGB rgb = ToRGB(cmyk);
 
 	int r = (int)(rgb.R * 255.f),
-		g = (int)(rgb.R * 255.f),
-		b = (int)(rgb.R * 255.f);
+		g = (int)(rgb.G * 255.f),
+		b = (int)(rgb.B * 255.f);
 
 	return RGB(r,g,b);
 }
@@ -1167,5 +1188,140 @@ LRESULT CALLBACK EditProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam
 	}
 
 	return CallWindowProc(OldEditProc, hWnd, iMessage, wParam, lParam);
+}
+
+// Update 08.04.25
+// Windows 디스플레이는 기본적으로 sRGB 색 공간을 사용한다.
+// GetPixel을 이용해서 가져온 RGB값은 이미 디스플레이 드라이버와 OS가 감마 보정한 결과일 가능성이 높다.
+// 따라서 GetPixel로 얻은 COLORREF 값은 sRGB 감마가 적용된 RGB 값으로 간주하는 것이 일반적이다.
+// sRGB는 인쇄 전용 CMYK 변환 시스템과 호환성이 높은데, 일반적으로 상업용 프린터 드라이버나 인쇄 RIP(Raster Image Processor)들은 대부분 sRGB를 RGB 입력 표준으로 삼는다.
+// Photoshop이나 Illustrator 같은 디자인 툴들도 CMYK 출력 시 내부적으로 sRGB를 기준으로 색상 의도를 계산한다.
+// ICC 프로파일, 즉 프린터 프로파일도 대부분 sRGB 기준으로 설계되므로 선형 RGB 값은 사용할 필요가 없다.
+float LinearToSRGB(float Channel){
+    if(Channel <= 0.0031308f){
+        return 12.92f * Channel;
+    }else{
+        return 1.055f * powf(Channel, 1.0f / 2.4f) - 0.055f;
+    }
+}
+
+MyRGB ConvertToSRGB(MyRGB rgb){
+    MyRGB srgb = Normalize(rgb.R, rgb.G, rgb.B);
+    srgb.R = LinearToSRGB(rgb.R);
+    srgb.G = LinearToSRGB(rgb.G);
+    srgb.B = LinearToSRGB(rgb.B);
+
+    return srgb;
+}
+
+float SRGBToLinear(float Channel){
+    if(Channel <= 0.04045f){
+        return Channel / 12.92f;
+    }else{
+        return powf((Channel + 0.055f) / 1.055f, 2.4f);
+    }
+}
+
+MyRGB ConvertToLinearRGB(MyRGB srgb){
+    MyRGB Linear = Normalize(srgb.R, srgb.G, srgb.B);
+    Linear.R = SRGBToLinear(srgb.R);
+    Linear.G = SRGBToLinear(srgb.G);
+    Linear.B = SRGBToLinear(srgb.B);
+
+    return Linear;
+}
+
+// 실제 프린터에 출력될 색상값을 조사한다.
+// CMYK16이나 CMYK_DBL로 변환하는 것도 가능하나, 굉장히 느려진다.
+// 이 함수는 추후 기능 확장시 활용하기로 한다.
+MyCMYK ToCMYKFromICC(int r, int g, int b){
+    MyCMYK ret = {0,};
+
+    BYTE rgb[3] = {(BYTE)r, (BYTE)g, (BYTE)b};
+    BYTE cmyk[4] = {0,};
+
+    cmsHPROFILE rgbProf = cmsCreate_sRGBProfile();
+    if(!rgbProf){ return ret; }
+
+    char iccPath[MAX_PATH] = {0,};
+    DWORD iccLength = MAX_PATH;
+    WCHAR PrinterName[MAX_PATH] = {0,};
+    DWORD PrinterNameLength = MAX_PATH;
+
+    BOOL bPrinter = GetDefaultPrinter(PrinterName, &PrinterNameLength);
+
+    if(bPrinter){
+        HDC hdc = CreateDC(NULL, PrinterName, NULL, NULL);
+        if(hdc){
+            GetICMProfileA(hdc, &iccLength, iccPath);
+            DeleteDC(hdc);
+        }
+    }
+
+    cmsHPROFILE cmykProf = NULL;
+
+    if(strlen(iccPath) > 0){
+        cmykProf = cmsOpenProfileFromFile(iccPath, "r");
+    }else{
+        WCHAR WindowsColorDir[MAX_PATH] = {0,};
+        DWORD PathLength = MAX_PATH;
+        if(GetColorDirectoryW(NULL, WindowsColorDir, &PathLength)){
+            char ansiColorDir[MAX_PATH] = {0,};
+            char fallbackPath[MAX_PATH] = {0,};
+            WideCharToMultiByte(CP_ACP, 0, WindowsColorDir, -1, ansiColorDir, MAX_PATH, NULL, NULL);
+            sprintf_s(fallbackPath, MAX_PATH, "%s\\USWebCoatedSWOP.icc", ansiColorDir);
+            cmykProf = cmsOpenProfileFromFile(fallbackPath, "r");
+        }
+    }
+
+    if(!cmykProf){
+        cmsCloseProfile(rgbProf);
+        return ret;
+    }
+
+    cmsColorSpaceSignature sig = cmsGetColorSpace(cmykProf);
+    // printf("ColorSpace Signature: %u (Hex: 0x%X)\n", sig, sig);
+
+    if(sig == cmsSigCmykData){
+        cmsHTRANSFORM transform = cmsCreateTransform(rgbProf, TYPE_RGB_8, cmykProf, TYPE_CMYK_8, INTENT_PERCEPTUAL, 0);
+
+        if(!transform){
+            cmsCloseProfile(rgbProf);
+            cmsCloseProfile(cmykProf);
+            return ret;
+        }
+
+        cmsDoTransform(transform, rgb, cmyk, 1);
+
+        ret.C = cmyk[0] * 100.f / 255.f;
+        ret.M = cmyk[1] * 100.f / 255.f;
+        ret.Y = cmyk[2] * 100.f / 255.f;
+        ret.K = cmyk[3] * 100.f / 255.f;
+
+        cmsDeleteTransform(transform);
+        cmsCloseProfile(rgbProf);
+        cmsCloseProfile(cmykProf);
+
+        return ret;
+    }
+
+    return ToCMYK(r,g,b);
+}
+
+void DebugMessage(LPCWSTR fmt, ...){
+    HANDLE hInput, hOutput, hError;
+
+    hInput = GetStdHandle(STD_INPUT_HANDLE);
+    hOutput = GetStdHandle(STD_OUTPUT_HANDLE);
+    hError = GetStdHandle(STD_ERROR_HANDLE);
+
+    WCHAR Debug[0x100];
+    va_list arg;
+    va_start(arg, fmt);
+    wvsprintf(Debug, fmt, arg);
+    va_end(arg);
+
+    DWORD dwWritten;
+    WriteConsole(hOutput, Debug, wcslen(Debug), &dwWritten, NULL);
 }
 
