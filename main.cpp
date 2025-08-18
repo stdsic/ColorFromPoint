@@ -121,7 +121,6 @@ MyRGB Normalize(COLORREF color);
 MyRGB Normalize(int r, int g, int b);
 float MyGetKValue(MyRGB rgb);
 MyCMY GetCMY(MyRGB rgb, float K);
-MyCMYK ToCMYK(COLORREF color);
 MyCMYK ToCMYK(int r, int g, int b);
 MyCMYK ToCMYKFromICC(int r, int g, int b);
 MyRGB ToRGB(MyCMYK cmyk);
@@ -1021,16 +1020,16 @@ MyRGB Normalize(int r, int g, int b){
 	// 0 ~ 1 : Normalization
 
 	MyRGB rgb;
-	rgb.R = r / 255.f;
-	rgb.G = g / 255.f;
-	rgb.B = b / 255.f;
+	rgb.R = max(0.0f, min(1.0f, r / 255.f));
+	rgb.G = max(0.0f, min(1.0f, g / 255.f));
+	rgb.B = max(0.0f, min(1.0f, b / 255.f));
 	return rgb;
 }
 
 float MyGetKValue(MyRGB rgb) {
 	// K = 1 - max(R',G',B')
 
-	float K = 1.f - max(rgb.R, max(rgb.G, rgb.B));
+	float K = 1.0f - max(rgb.R, max(rgb.G, rgb.B));
 	return K;
 }
 
@@ -1040,31 +1039,25 @@ MyCMY GetCMY(MyRGB rgb, float K) {
 	// Y = (1 - B' - K) / (1 - K)
 
 	MyCMY cmy = {0,};
-	if (K < 1.f) {
+	if(K < 1.0f){
 		cmy.C = (1.f - rgb.R - K) / (1.f - K);
 		cmy.M = (1.f - rgb.G - K) / (1.f - K);
 		cmy.Y = (1.f - rgb.B - K) / (1.f - K);
-	}
+	}else{
+        cmy.C = 0.0f;
+        cmy.M = 0.0f;
+        cmy.Y = 0.0f;
+    }
 
 	return cmy;
 }
 
-MyCMYK ToCMYK(COLORREF color){
-	MyRGB rgb = Normalize(color);
-	float K = MyGetKValue(rgb);
-	MyCMY cmy = GetCMY(rgb, K);
-
-	MyCMYK cmyk;
-	cmyk.C = cmy.C * 100.f;
-	cmyk.M = cmy.M * 100.f;
-	cmyk.Y = cmy.Y * 100.f;
-	cmyk.K = K * 100.f;
-
-	return cmyk;
-}
-
 MyCMYK ToCMYK(int r, int g, int b){
 	MyRGB rgb = Normalize(r,g,b);
+    // 여기서 역감마 보정 후 CMYK로 변환한다.
+    rgb.R = SRGBToLinear(rgb.R);
+    rgb.G = SRGBToLinear(rgb.G);
+    rgb.B = SRGBToLinear(rgb.B);
 	float K = MyGetKValue(rgb);
 	MyCMY cmy = GetCMY(rgb, K);
 
@@ -1199,6 +1192,11 @@ LRESULT CALLBACK EditProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam
 // sRGB는 인쇄 전용 CMYK 변환 시스템과 호환성이 높은데, 일반적으로 상업용 프린터 드라이버나 인쇄 RIP(Raster Image Processor)들은 대부분 sRGB를 RGB 입력 표준으로 삼는다.
 // Photoshop이나 Illustrator 같은 디자인 툴들도 CMYK 출력 시 내부적으로 sRGB를 기준으로 색상 의도를 계산한다.
 // ICC 프로파일, 즉 프린터 프로파일도 대부분 sRGB 기준으로 설계되므로 선형 RGB 값은 사용할 필요가 없다.
+
+// Update 08.18.25
+// ICC 프로파일의 역할을 좀 더 알아보니 sRGB -> CMYK 변환 간 감마 보정 포함 여부와 잉크 특성, 종이 반사율 등을 모두 고려한다고 한다.
+// 또, sRGB 값을 그대로 받아서 선형 RGB로 변환 후, 다시 CMYK로 변환한다고 한다.
+// 잉크 혼합 기반의 색상 모델이라 선형적인 빛의 강도를 기준으로 계산해야 정확한 결과가 나온다.
 float LinearToSRGB(float Channel){
     if(Channel <= 0.0031308f){
         return 12.92f * Channel;
