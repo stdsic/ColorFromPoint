@@ -29,6 +29,11 @@ MyApiDll.dll<br>
 - stdsic — @https://github.com/stdsic/ColorFromPoint<br>
 <br><br>
 ## 📚 Version History<br>
+- 1.0.2<br>
+  - sRGB to CMYK 변환 함수 수정<br>
+    - 오차 범위 +-5%<br>
+    -  프린터 출력물과 차이 최소화<br>
+  - 메타 데이터 수정<br>
 - 1.0.1<br>
   - 메타 데이터 수정<br>
 - 1.0.0<br>
