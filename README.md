@@ -31,7 +31,7 @@ MyApiDll.dll<br>
 <br><br>
 ## 📚 Version History<br>
 - 1.1.0<br>
-  - CMYK 색 공간 변환식 제거
+  - CMYK 색 공간 및 변환식 제거
 - 1.0.2<br>
   - sRGB to CMYK 변환 함수 수정
   - 프로그램 메타 데이터 수정
