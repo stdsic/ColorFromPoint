@@ -30,7 +30,6 @@ MyApiDll.dll<br>
 - stdsic — @https://github.com/stdsic/ColorFromPoint<br>
 <br><br>
 ## 📚 Version History<br>
-<<<<<<< HEAD
 - 1.1.0<br>
   - CMYK 색 공간 변환식 제거
 - 1.0.2<br>
