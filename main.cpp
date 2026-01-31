@@ -4,8 +4,8 @@
 #include <winspool.h>
 #include <strsafe.h>
 #include <math.h>
-#include <lcms2.h>
-#include <icm.h>
+#include <lcms2.h>      // LittleCMS
+#include <icm.h>        // WCS API          Mingw 환경에서는 제대로 동작하지 않는다. 최신 버전이 아니라 구조체 정의가 다르고 함수 시그니처가 변경되었다.
 #define CLASS_NAME		L"ColorFromPoint"
 #define WM_CHANGEFOCUS	WM_USER+1
 #define WM_MOUSEHOOK	WM_USER+321
@@ -19,6 +19,33 @@
 #define IDC_LBSTART		2049
 #define IDM_PROGRAM		4097
 #define IDM_LINE		4098
+
+#define OBSOLETE        0
+
+// Update 25. 08.04
+// Windows 디스플레이는 기본적으로 sRGB 색 공간을 사용한다.
+// GetPixel을 이용해서 가져온 RGB값은 이미 디스플레이 드라이버와 OS가 감마 보정한 결과일 가능성이 높다.
+// 따라서 GetPixel로 얻은 COLORREF 값은 sRGB 감마가 적용된 RGB 값으로 간주하는 것이 일반적이다.
+// sRGB는 인쇄 전용 CMYK 변환 시스템과 호환성이 높은데, 일반적으로 상업용 프린터 드라이버나 인쇄 RIP(Raster Image Processor)들은 대부분 sRGB를 RGB 입력 표준으로 삼는다.
+// Photoshop이나 Illustrator 같은 디자인 툴들도 CMYK 출력 시 내부적으로 sRGB를 기준으로 색상 의도를 계산한다.
+// ICC 프로파일, 즉 프린터 프로파일도 대부분 sRGB 기준으로 설계되므로 선형 RGB 값은 직접 사용하는 것이 아니라 중간 과정에서만 사용된다.
+
+// Update 25.08.18
+// ICC 프로파일의 역할을 좀 더 알아보니 sRGB -> CMYK 변환 간 감마 보정 포함 여부와 잉크 특성, 종이 반사율 등을 모두 고려한다고 한다.
+// 또, sRGB 값을 그대로 받아서 선형 RGB로 변환 후, 다시 CMYK로 변환한다고 한다.
+// 잉크 혼합 기반의 색상 모델이라 선형적인 빛의 강도를 기준으로 계산해야 정확한 결과가 나온다.
+// 실제 프린터에 출력될 색상값을 조사한다.
+// CMYK16이나 CMYK_DBL로 변환하는 것도 가능하나, 굉장히 느려진다.
+// 이 함수는 추후 기능 확장시 활용하기로 한다.
+
+// Update 26.01.31
+// ICC는 표준이 존재하지만 네트워크 참조 모델과 같이 참조일 뿐 장치마다 전부 다르다.
+// 여기서 사용된 CMY 변환 공식도 아주 오래된 것이라 분명한 한계가 존재한다.
+// 파란색(0,0,255)을 CMYK로 변환해보면 Magenta 값이 이상하다는 것을 알 수 있다.
+// 유난히 높은 값(9x.xx)으로 조사되는데 이는 CMY 변환 공식의 한계이며,
+// 이를 해결하려면 시스템에 설치된 장치와 icc 프로파일을 직접 조사하여 가져온 후 LittleCMS, WCS API 등을 이용해 적용해야 한다.
+// 이는 추후 시간이 생기면 추가하기로 하고 당장은 CMYK 관련 함수와 코드를 사용하지 않기로 한다.
+// HSV 또는 HSL 모니터 색 공간을 추가할 예정이며 
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK EditProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam);
@@ -191,6 +218,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 	POINT		Origin;
 	COLORREF	color;
 	TCHAR		HexCode[6];
+	TCHAR		Percentage[0x10];
 	HMONITOR	hCurrentMonitor;
 	int x, y, Width, iWidth, Height, iHeight, iRadius, ConvertLength;
 
@@ -299,8 +327,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 
 				x += Padding * 2;
 				Width = (crt.right - x - (Padding * 4))/3;
-				SetRect(&srt, x, y, Width, Height);
-				SetWindowPos(hControls[nEdit - 1], NULL, x, y, Width, Height, SWP_NOZORDER);
+				// SetRect(&srt, x, y, Width, Height);
+				// SetWindowPos(hControls[nEdit - 1], NULL, x, y, Width, Height, SWP_NOZORDER);
 
 				iWidth = (LOWORD(lParam) - (Padding * 2 + g_rcMagnify.right)) / 2;
 				iHeight = (HIWORD(lParam) - (y + Height + Padding)) / 2;
@@ -308,18 +336,18 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 				EllipseOrigin.x = LOWORD(lParam) - iWidth;
 				EllipseOrigin.y = HIWORD(lParam) - iHeight;
 
-				for(int i=0; i<3; i++){
+				for(int i=0; i<2; i++){
 					y = Padding;
 					SetRect(&srt, x, y, Width, Height);
-					SetWindowPos(hControls[0 + (i*3)], NULL, x, y, Width, Height, SWP_NOZORDER);
+					SetWindowPos(hControls[3 + (i*3)], NULL, x, y, Width, Height, SWP_NOZORDER);
 
 					y = Padding + (g_rcMagnify.bottom - Height) / 2;
 					SetRect(&srt, x, y, Width, Height);
-					SetWindowPos(hControls[1 + (i*3)], NULL, x, y, Width, Height, SWP_NOZORDER);
+					SetWindowPos(hControls[4 + (i*3)], NULL, x, y, Width, Height, SWP_NOZORDER);
 
 					y = Padding + g_rcMagnify.bottom - Height;
 					SetRect(&srt, x, y, Width, Height);
-					SetWindowPos(hControls[2 + (i*3)], NULL, x, y, Width, Height, SWP_NOZORDER);
+					SetWindowPos(hControls[5 + (i*3)], NULL, x, y, Width, Height, SWP_NOZORDER);
 
 					x += Width + Padding;
 				}
@@ -415,24 +443,36 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 									b = GetBValue(EllipseColor);
 
                                 // 26.01.31 : 백분율 표기 오류 발견, 수정 예정
-								memset(HexCode, 0, sizeof(HexCode));
-								MyCMYK cmyk = ToCMYK(r,g,b);
-								StringCbPrintf(HexCode, sizeof(HexCode), L"%.2f", cmyk.C);
-								SetDlgItemText(hWnd, IDC_EDSTART + 2, HexCode);
+                                // 오래된 CMY 변환 공식을 사용하다 보니 어쩔 수 없이 발생하는 한계인 것으로 보인다.
+                                // 인쇄 색공간(감산혼합: CMYK)은 모니터 색공간과 색을 만드는 방식 자체가 달라 변환에 한계가 있다.
+                                // 현대에는 ICC 표준에 맞게 프린터기 제조업체에서 icm, icc 파일을 제작하여 같이 배포한다.
+                                // 즉, CMYK는 장치에 의존적이고 장치마다 CMYK가 전부 다 다르다
+                                // 때문에, 설계상의 문제가 있던 것이므로 이를 전면 수정하기로 한다.
+                                // 추후 시간이 되면 HSV, HSL 색 공간을 추가로 제공하기로 한다.
 
-								StringCbPrintf(HexCode, sizeof(HexCode), L"%.2f", cmyk.M);
-								SetDlgItemText(hWnd, IDC_EDSTART, HexCode);
+                                #if (OBSOLETE)
+                                {
+                                    memset(Percentage, 0, sizeof(Percentage));
+                                    MyCMYK cmyk = ToCMYKFromICC(r,g,b);
+                                    StringCbPrintf(Percentage, sizeof(Percentage), L"%.2f", cmyk.C);
+                                    SetDlgItemText(hWnd, IDC_EDSTART + 2, Percentage);
 
-								StringCbPrintf(HexCode, sizeof(HexCode), L"%.2f", cmyk.Y);
-								SetDlgItemText(hWnd, IDC_EDSTART+1, HexCode);
+                                    StringCbPrintf(Percentage, sizeof(Percentage), L"%.2f", cmyk.M);
+                                    SetDlgItemText(hWnd, IDC_EDSTART, Percentage);
 
-								StringCbPrintf(HexCode, sizeof(HexCode), L"%.2f", cmyk.K);
-								SetDlgItemText(hWnd, IDC_EDSTART+9, HexCode);
+                                    StringCbPrintf(Percentage, sizeof(Percentage), L"%.2f", cmyk.Y);
+                                    SetDlgItemText(hWnd, IDC_EDSTART+1, Percentage);
+
+                                    StringCbPrintf(Percentage, sizeof(Percentage), L"%.2f", cmyk.K);
+                                    SetDlgItemText(hWnd, IDC_EDSTART+9, Percentage);
+                                }
+                                #endif
 								
 								SetDlgItemInt(hWnd, IDC_EDSTART+3, r, FALSE);
 								SetDlgItemInt(hWnd, IDC_EDSTART+4, g, FALSE);
 								SetDlgItemInt(hWnd, IDC_EDSTART+5, b, FALSE);
 
+								memset(HexCode, 0, sizeof(HexCode));
 								ToHex(r, HexCode, sizeof(HexCode));
 								SetDlgItemText(hWnd, IDC_EDSTART+6, HexCode); 
 								ToHex(g, HexCode, sizeof(HexCode));
@@ -576,30 +616,32 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 						DrawEdge(g_hMemDC, &g_rcRed, EDGE_SUNKEN, BF_RECT);
 						DrawEdge(g_hMemDC, &g_rcGreen, EDGE_SUNKEN, BF_RECT);
 						DrawEdge(g_hMemDC, &g_rcBlue, EDGE_SUNKEN, BF_RECT);
-						DrawEdge(g_hMemDC, &g_rcBlack, EDGE_SUNKEN, BF_RECT);
+						// DrawEdge(g_hMemDC, &g_rcBlack, EDGE_SUNKEN, BF_RECT);
 
                         int BkMode = SetBkMode(g_hMemDC, TRANSPARENT);
 						CopyRect(&srt, &g_rcRed);
 						InflateRect(&srt, -EDGEFRAME, -EDGEFRAME);
 						FillRect(g_hMemDC, &srt, hRedBrush);
-                        DrawText(g_hMemDC, L"M", -1, &g_rcRed, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+                        DrawText(g_hMemDC, L"R", -1, &g_rcRed, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
 						CopyRect(&srt, &g_rcGreen);
 						InflateRect(&srt, -EDGEFRAME, -EDGEFRAME);
 						FillRect(g_hMemDC, &srt, hGreenBrush);
-                        DrawText(g_hMemDC, L"Y", -1, &g_rcGreen, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+                        DrawText(g_hMemDC, L"G", -1, &g_rcGreen, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
 						CopyRect(&srt, &g_rcBlue);
 						InflateRect(&srt, -EDGEFRAME, -EDGEFRAME);
 						FillRect(g_hMemDC, &srt, hBlueBrush);
-                        DrawText(g_hMemDC, L"C", -1, &g_rcBlue, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+                        DrawText(g_hMemDC, L"B", -1, &g_rcBlue, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
+                        #if (OBSOLETE)
 						CopyRect(&srt, &g_rcBlack);
 						InflateRect(&srt, -EDGEFRAME, -EDGEFRAME);
 						FillRect(g_hMemDC, &srt, hBlackBrush);
                         DrawText(g_hMemDC, L"K", -1, &g_rcBlack, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-                        SetBkMode(g_hMemDC, BkMode);
+                        #endif
 
+                        SetBkMode(g_hMemDC, BkMode);
 						HBRUSH hEllipseBrush = CreateSolidBrush(EllipseColor),
 							   hEllipseOldBrush	= (HBRUSH)SelectObject(g_hMemDC, hEllipseBrush);
 						Ellipse(g_hMemDC, EllipseOrigin.x - g_iRadius, EllipseOrigin.y - g_iRadius, EllipseOrigin.x + g_iRadius, EllipseOrigin.y + g_iRadius);
@@ -1027,91 +1069,38 @@ MyRGB Normalize(int r, int g, int b){
 	return rgb;
 }
 
-float MyGetKValue(MyRGB rgb) {
-	// K = 1 - max(R',G',B')
-
-	float K = 1.0f - max(rgb.R, max(rgb.G, rgb.B));
-	return K;
-}
-
-MyCMY GetCMY(MyRGB rgb, float K) {
-	// C = (1 - R' - K) / (1 - K)
-	// M = (1 - G' - K) / (1 - K)
-	// Y = (1 - B' - K) / (1 - K)
-
-	MyCMY cmy = {0,};
-	if(K < 1.0f){
-		cmy.C = (1.f - rgb.R - K) / (1.f - K);
-		cmy.M = (1.f - rgb.G - K) / (1.f - K);
-		cmy.Y = (1.f - rgb.B - K) / (1.f - K);
-	}else{
-        cmy.C = 0.0f;
-        cmy.M = 0.0f;
-        cmy.Y = 0.0f;
+float LinearToSRGB(float Channel){
+    if(Channel <= 0.0031308f){
+        return 12.92f * Channel;
+    }else{
+        return 1.055f * powf(Channel, 1.0f / 2.4f) - 0.055f;
     }
-
-	return cmy;
 }
 
-MyCMYK ToCMYK(int r, int g, int b){
-	MyRGB rgb = Normalize(r,g,b);
-    // 여기서 역감마 보정 후 CMYK로 변환한다.
-    rgb.R = SRGBToLinear(rgb.R);
-    rgb.G = SRGBToLinear(rgb.G);
-    rgb.B = SRGBToLinear(rgb.B);
-	float K = MyGetKValue(rgb);
-	MyCMY cmy = GetCMY(rgb, K);
+MyRGB ConvertToSRGB(MyRGB rgb){
+    MyRGB srgb = Normalize(rgb.R, rgb.G, rgb.B);
+    srgb.R = LinearToSRGB(rgb.R);
+    srgb.G = LinearToSRGB(rgb.G);
+    srgb.B = LinearToSRGB(rgb.B);
 
-	MyCMYK cmyk;
-	cmyk.C = cmy.C * 100.f;
-	cmyk.M = cmy.M * 100.f;
-	cmyk.Y = cmy.Y * 100.f;
-	cmyk.K = K * 100.f;
-
-	return cmyk;
+    return srgb;
 }
 
-MyRGB ToRGB(MyCMYK cmyk){
-	MyRGB rgb;
-
-	// C' = C / 100
-	// M' = M / 100
-	// Y' = Y / 100
-	// K' = K / 100
-	float C = cmyk.C /  100.f,
-		  M = cmyk.M /  100.f,
-		  Y = cmyk.Y /  100.f,
-		  K = cmyk.K /  100.f;
-
-	// R = (1 - C')(1 - K') * 255
-	// G = (1 - C')(1 - K') * 255
-	// B = (1 - C')(1 - K') * 255
-	rgb.R = (1.f - C) * (1.f - K);
-	rgb.G = (1.f - M) * (1.f - K);
-	rgb.B = (1.f - Y) * (1.f - K);
-
-	return rgb;
+float SRGBToLinear(float Channel){
+    if(Channel <= 0.04045f){
+        return Channel / 12.92f;
+    }else{
+        return powf((Channel + 0.055f) / 1.055f, 2.4f);
+    }
 }
 
-COLORREF ToCOLORREF(MyCMYK cmyk){
-	// 0 ~ 1: 정규화 값 확인할 수 있도록 변환 공식 분할
-	MyRGB rgb = ToRGB(cmyk);
+MyRGB ConvertToLinearRGB(MyRGB srgb){
+    MyRGB Linear = Normalize(srgb.R, srgb.G, srgb.B);
+    Linear.R = SRGBToLinear(srgb.R);
+    Linear.G = SRGBToLinear(srgb.G);
+    Linear.B = SRGBToLinear(srgb.B);
 
-	int r = (int)(rgb.R * 255.f),
-		g = (int)(rgb.G * 255.f),
-		b = (int)(rgb.B * 255.f);
-
-	return RGB(r,g,b);
-}
-
-HBRUSH CreateCMYKBrush(MyCMYK cmyk){
-	COLORREF color = ToCOLORREF(cmyk);
-	return CreateSolidBrush(color);
-}
-
-void ToHex(MyCMYK cmyk, LPTSTR ret, int Size){
-	COLORREF color = ToCOLORREF(cmyk);
-	StringCbPrintf(ret, Size, L"%02X%02X%02X", GetRValue(color), GetGValue(color), GetBValue(color));
+    return Linear;
 }
 
 LRESULT CALLBACK EditProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam){
@@ -1186,55 +1175,119 @@ LRESULT CALLBACK EditProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam
 	return CallWindowProc(OldEditProc, hWnd, iMessage, wParam, lParam);
 }
 
-// Update 08.04.25
-// Windows 디스플레이는 기본적으로 sRGB 색 공간을 사용한다.
-// GetPixel을 이용해서 가져온 RGB값은 이미 디스플레이 드라이버와 OS가 감마 보정한 결과일 가능성이 높다.
-// 따라서 GetPixel로 얻은 COLORREF 값은 sRGB 감마가 적용된 RGB 값으로 간주하는 것이 일반적이다.
-// sRGB는 인쇄 전용 CMYK 변환 시스템과 호환성이 높은데, 일반적으로 상업용 프린터 드라이버나 인쇄 RIP(Raster Image Processor)들은 대부분 sRGB를 RGB 입력 표준으로 삼는다.
-// Photoshop이나 Illustrator 같은 디자인 툴들도 CMYK 출력 시 내부적으로 sRGB를 기준으로 색상 의도를 계산한다.
-// ICC 프로파일, 즉 프린터 프로파일도 대부분 sRGB 기준으로 설계되므로 선형 RGB 값은 사용할 필요가 없다.
+void DebugMessage(LPCWSTR fmt, ...){
+    HANDLE hInput, hOutput, hError;
 
-// Update 08.18.25
-// ICC 프로파일의 역할을 좀 더 알아보니 sRGB -> CMYK 변환 간 감마 보정 포함 여부와 잉크 특성, 종이 반사율 등을 모두 고려한다고 한다.
-// 또, sRGB 값을 그대로 받아서 선형 RGB로 변환 후, 다시 CMYK로 변환한다고 한다.
-// 잉크 혼합 기반의 색상 모델이라 선형적인 빛의 강도를 기준으로 계산해야 정확한 결과가 나온다.
-float LinearToSRGB(float Channel){
-    if(Channel <= 0.0031308f){
-        return 12.92f * Channel;
+    hInput = GetStdHandle(STD_INPUT_HANDLE);
+    hOutput = GetStdHandle(STD_OUTPUT_HANDLE);
+    hError = GetStdHandle(STD_ERROR_HANDLE);
+
+    WCHAR Debug[0x100];
+    va_list arg;
+    va_start(arg, fmt);
+    wvsprintf(Debug, fmt, arg);
+    va_end(arg);
+
+    DWORD dwWritten;
+    WriteConsole(hOutput, Debug, wcslen(Debug), &dwWritten, NULL);
+}
+
+#if (OBSOLETE) 
+float MyGetKValue(MyRGB rgb) {
+    // K = 1 - max(R',G',B')
+
+    float K = 1.0f - max(rgb.R, max(rgb.G, rgb.B));
+    return K;
+}
+
+MyCMY GetCMY(MyRGB rgb, float K) {
+    // C = (1 - R' - K) / (1 - K)
+    // M = (1 - G' - K) / (1 - K)
+    // Y = (1 - B' - K) / (1 - K)
+
+    MyCMY cmy = {0,};
+    if(K < 1.0f){
+        cmy.C = (1.f - rgb.R - K) / (1.f - K);
+        cmy.M = (1.f - rgb.G - K) / (1.f - K);
+        cmy.Y = (1.f - rgb.B - K) / (1.f - K);
     }else{
-        return 1.055f * powf(Channel, 1.0f / 2.4f) - 0.055f;
+        cmy.C = 0.0f;
+        cmy.M = 0.0f;
+        cmy.Y = 0.0f;
     }
+
+    return cmy;
 }
 
-MyRGB ConvertToSRGB(MyRGB rgb){
-    MyRGB srgb = Normalize(rgb.R, rgb.G, rgb.B);
-    srgb.R = LinearToSRGB(rgb.R);
-    srgb.G = LinearToSRGB(rgb.G);
-    srgb.B = LinearToSRGB(rgb.B);
 
-    return srgb;
+MyCMYK ToCMYK(int r, int g, int b){
+    MyRGB rgb = Normalize(r,g,b);
+    // 프린터기는 sRGB -> RGB -> XYZ -> CMYK와 같이 네 가지 과정을 통해 CMYK로 변환한다.
+    // 일반적인 컬러 픽커는 이를 고려하지 않으나 필요한 경우 윈도우 시스템이 제공하는 WCS API를 활용할 수 있다.
+
+    rgb.R = SRGBToLinear(rgb.R);
+    rgb.G = SRGBToLinear(rgb.G);
+    rgb.B = SRGBToLinear(rgb.B);
+
+    float K = MyGetKValue(rgb);
+    MyCMY cmy = GetCMY(rgb, K);
+
+    MyCMYK cmyk;
+    cmyk.C = cmy.C * 100.f;
+    cmyk.M = cmy.M * 100.f;
+    cmyk.Y = cmy.Y * 100.f;
+    cmyk.K = K * 100.f;
+
+    return cmyk;
 }
 
-float SRGBToLinear(float Channel){
-    if(Channel <= 0.04045f){
-        return Channel / 12.92f;
-    }else{
-        return powf((Channel + 0.055f) / 1.055f, 2.4f);
-    }
+COLORREF ToCOLORREF(MyCMYK cmyk){
+    // 0 ~ 1: 정규화 값 확인할 수 있도록 변환 공식 분할
+    MyRGB rgb = ToRGB(cmyk);
+
+    int r = (int)(rgb.R * 255.f),
+        g = (int)(rgb.G * 255.f),
+        b = (int)(rgb.B * 255.f);
+
+    return RGB(r,g,b);
 }
 
-MyRGB ConvertToLinearRGB(MyRGB srgb){
-    MyRGB Linear = Normalize(srgb.R, srgb.G, srgb.B);
-    Linear.R = SRGBToLinear(srgb.R);
-    Linear.G = SRGBToLinear(srgb.G);
-    Linear.B = SRGBToLinear(srgb.B);
+MyRGB ToRGB(MyCMYK cmyk){
+    MyRGB rgb;
 
-    return Linear;
+    // C' = C / 100
+    // M' = M / 100
+    // Y' = Y / 100
+    // K' = K / 100
+    float C = cmyk.C /  100.f,
+          M = cmyk.M /  100.f,
+          Y = cmyk.Y /  100.f,
+          K = cmyk.K /  100.f;
+
+    // R = (1 - C')(1 - K') * 255
+    // G = (1 - C')(1 - K') * 255
+    // B = (1 - C')(1 - K') * 255
+    rgb.R = (1.f - C) * (1.f - K);
+    rgb.G = (1.f - M) * (1.f - K);
+    rgb.B = (1.f - Y) * (1.f - K);
+
+    // rgb.R = LinearToSRGB(rgb.R);
+    // rgb.G = LinearToSRGB(rgb.G);
+    // rgb.B = LinearToSRGB(rgb.B);
+
+    return rgb;
 }
 
-// 실제 프린터에 출력될 색상값을 조사한다.
-// CMYK16이나 CMYK_DBL로 변환하는 것도 가능하나, 굉장히 느려진다.
-// 이 함수는 추후 기능 확장시 활용하기로 한다.
+HBRUSH CreateCMYKBrush(MyCMYK cmyk){
+    COLORREF color = ToCOLORREF(cmyk);
+    return CreateSolidBrush(color);
+}
+
+void ToHex(MyCMYK cmyk, LPTSTR ret, int Size){
+    COLORREF color = ToCOLORREF(cmyk);
+    StringCbPrintf(ret, Size, L"%02X%02X%02X", GetRValue(color), GetGValue(color), GetBValue(color));
+}
+
 MyCMYK ToCMYKFromICC(int r, int g, int b){
     MyCMYK ret = {0,};
 
@@ -1270,7 +1323,7 @@ MyCMYK ToCMYKFromICC(int r, int g, int b){
             char ansiColorDir[MAX_PATH] = {0,};
             char fallbackPath[MAX_PATH] = {0,};
             WideCharToMultiByte(CP_ACP, 0, WindowsColorDir, -1, ansiColorDir, MAX_PATH, NULL, NULL);
-            sprintf_s(fallbackPath, MAX_PATH, "%s\\USWebCoatedSWOP.icc", ansiColorDir);
+            sprintf_s(fallbackPath, MAX_PATH, "%s\\sRGB Color Space Profile.icm", ansiColorDir);
             cmykProf = cmsOpenProfileFromFile(fallbackPath, "r");
         }
     }
@@ -1308,21 +1361,4 @@ MyCMYK ToCMYKFromICC(int r, int g, int b){
 
     return ToCMYK(r,g,b);
 }
-
-void DebugMessage(LPCWSTR fmt, ...){
-    HANDLE hInput, hOutput, hError;
-
-    hInput = GetStdHandle(STD_INPUT_HANDLE);
-    hOutput = GetStdHandle(STD_OUTPUT_HANDLE);
-    hError = GetStdHandle(STD_ERROR_HANDLE);
-
-    WCHAR Debug[0x100];
-    va_list arg;
-    va_start(arg, fmt);
-    wvsprintf(Debug, fmt, arg);
-    va_end(arg);
-
-    DWORD dwWritten;
-    WriteConsole(hOutput, Debug, wcslen(Debug), &dwWritten, NULL);
-}
-
+#endif
