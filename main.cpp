@@ -414,6 +414,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 									g = GetGValue(EllipseColor),
 									b = GetBValue(EllipseColor);
 
+                                // 26.01.31 : 백분율 표기 오류 발견, 수정 예정
 								memset(HexCode, 0, sizeof(HexCode));
 								MyCMYK cmyk = ToCMYK(r,g,b);
 								StringCbPrintf(HexCode, sizeof(HexCode), L"%.2f", cmyk.C);
