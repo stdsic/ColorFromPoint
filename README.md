@@ -6,7 +6,7 @@ Windows Legacy API와 후킹을 이용한 컬러 픽커입니다.<br>
 ## 📝 Description<br>
 "ColorFromPoint"는 이름 그대로 마우스 커서가 위치한 지점의 색상을 조사하는 프로그램입니다.<br>
 마우스를 기준으로 일정 범위를 캡처한 후 픽셀 단위로 값을 추출할 수 있습니다.<br>
-작업 영역 내에 에디트 컨트롤을 배치하여 RGB, HSV, HEX 값을 표시합니다.<br>
+작업 영역 내에 에디트 컨트롤을 배치하여 RGB, HSV, HSL, HEX 값을 표시합니다.<br>
 알파 채널은 지원하지 않습니다.<br>
 <br>
 다음과 같은 단축키를 지원합니다.<br>
@@ -31,7 +31,7 @@ MyApiDll.dll<br>
 - 기본적으로 알파 채널은 포함되지 않으며 투명도 정보는 버려집니다.
 - 알파 채널이 RGB 값과 곱해지는 프리멀티플 알파(Premultiplied alpha)가 적용된 경우 값이 제대로 조사되지 않습니다.
   - Direct 2D, GDI+ 등이 이에 해당됩니다.
-- 웹의 RGBA는 대부분 비프리멀티플(non-Premultiplied alpha) 방식입니다.
+- 웹의 RGBA, HSLA는 대부분 비프리멀티플(non-Premultiplied alpha) 방식입니다.
 - 현대의 모니터는 대체로 감마가 적용된 sRGB 색 공간을 표준으로 하며 위 프로그램에서 조사하는 색상 값도 이 표준을 따릅니다.
 - 조작 방법 및 더 자세한 정보는 프로그램 실행 후 [메뉴] - [프로그램 소개] 항목에서 확인하실 수 있습니다.
 - CMYK 색 공간 변환식은 장치 의존적이므로 명확한 한계가 존재합니다. v1.1 이후 CMYK 변환식이 제거되었습니다.
@@ -40,6 +40,10 @@ MyApiDll.dll<br>
 - stdsic — @https://github.com/stdsic/ColorFromPoint<br>
 <br><br>
 ## 📚 Version History<br>
+- 1.1.2<br>
+  - HSL 색 공간 추가
+  - 프로그램 소개글 수정
+  - 일부 메세지 로직 수정
 - 1.1.1<br>
   - HSV 색 공간 추가
   - 프로그램 소개글 수정
