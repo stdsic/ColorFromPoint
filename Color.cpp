@@ -1,7 +1,7 @@
 #include "Color.h"
 #include <math.h>
-#define min(a,b) (((a) < (b)) ? (a) : (b))
-#define max(a,b) (((a) > (b)) ? (a) : (b))
+#define min(a,b)    (((a) < (b)) ? (a) : (b))
+#define max(a,b)    (((a) > (b)) ? (a) : (b))
 #define CLAMP(Min, Max, N) (((N) < (Min)) ? (Min) : ((N) < (Max)) ? (N) : (Max));
 
 const float Color::Ratio = 1.f / 255.f;
@@ -89,6 +89,7 @@ void Color::ToHSV(){
     _S = (BrightestValue == 0.f) ? 0.f : Delta / BrightestValue;
     if(Delta == 0.f){ _H = 0.f; }
     else{
+        // 6구간
         if(BrightestValue == _R){
             _H = fmodf((_G - _B) / Delta, 6.f);
         }else if(BrightestValue == _G){
@@ -99,10 +100,30 @@ void Color::ToHSV(){
 
         // 정규화
         _H /= 6.f;
+        if(_H < 0.f){ _H += 1.f; }
+    }
+}
 
-        if(_H < 0.f){
-            _H += 1.f;
+void Color::ToHSL(){
+    float BrightestValue = max(_R, max(_G, _B));
+    float DarkestValue = min(_R, min(_G, _B));
+    float Delta = BrightestValue - DarkestValue;
+
+    _L = (BrightestValue + DarkestValue) * 0.5f;
+    _S = (BrightestValue == 0.f) ? 0.f : Delta / (1.f - fabs(2.f * _L - 1.f));
+
+    if(Delta == 0.f){ _H = 0.f; }
+    else {
+        if(BrightestValue == _R) {
+            _H = fmodf((_G - _B) / Delta, 6.f);
+        } else if (BrightestValue == _G) {
+            _H = ((_B - _R) / Delta) + 2.f;
+        } else {
+            _H = ((_R - _G) / Delta) + 4.f;
         }
+
+        _H /= 6.f;
+        if(_H < 0.f){ _H += 1.f; }
     }
 }
 
