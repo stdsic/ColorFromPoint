@@ -6,6 +6,7 @@
 #include <math.h>
 #include <lcms2.h>      // LittleCMS
 #include <icm.h>        // WCS API          Mingw 환경에서는 제대로 동작하지 않는다. 최신 버전이 아니라 구조체 정의가 다르고 함수 시그니처가 변경되었다.
+#include "Color.h"
 #define CLASS_NAME		L"ColorFromPoint"
 #define WM_CHANGEFOCUS	WM_USER+1
 #define WM_MOUSEHOOK	WM_USER+321
@@ -45,7 +46,10 @@
 // 유난히 높은 값(9x.xx)으로 조사되는데 이는 CMY 변환 공식의 한계이며,
 // 이를 해결하려면 시스템에 설치된 장치와 icc 프로파일을 직접 조사하여 가져온 후 LittleCMS, WCS API 등을 이용해 적용해야 한다.
 // 이는 추후 시간이 생기면 추가하기로 하고 당장은 CMYK 관련 함수와 코드를 사용하지 않기로 한다.
-// HSV 또는 HSL 모니터 색 공간을 추가할 예정이며 
+
+// Update 26.02.01
+// 이전 프로젝트에서 만들어 둔 Color 클래스를 추가했다.
+// COLORREF와 HSV간 변환을 수행하는 클래스이며 변환 생성자와 전역 연산자 오버로딩을 이용해 캡슐화했다.
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK EditProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam);
@@ -128,32 +132,13 @@ typedef struct tag_MyRGB{
 	float B;
 }MyRGB;
 
-typedef struct tag_MyCMY{
-	float C;
-	float M;
-	float Y;
-}MyCMY;
-
-typedef struct tag_MyCMYK{
-	float C;
-	float M;
-	float Y;
-	float K;
-}MyCMYK;
-
-void ToHex(COLORREF color, LPTSTR ret, int Size);
-void ToHex(int Value, LPTSTR ret, int Size);
+void ToHexCode(COLORREF color, LPTSTR ret, int Size);
+void ToHexCode(int Value, LPTSTR ret, int Size);
+void ToHSVCode(float Value, LPTSTR ret, int Size);
 COLORREF ToCOLORREF(LPCTSTR HexCode);
 MyRGB Normalize(COLORREF color);
 MyRGB Normalize(int r, int g, int b);
 float MyGetKValue(MyRGB rgb);
-MyCMY GetCMY(MyRGB rgb, float K);
-MyCMYK ToCMYK(int r, int g, int b);
-MyCMYK ToCMYKFromICC(int r, int g, int b);
-MyRGB ToRGB(MyCMYK cmyk);
-COLORREF ToCOLORREF(MyCMYK cmyk);
-HBRUSH CreateCMYKBrush(MyCMYK cmyk);
-void ToHex(MyCMYK cmyk, LPTSTR ret, int Size);
 float LinearToSRGB(float Channel);
 MyRGB ConvertToSRGB(MyRGB rgb);
 float SRGBToLinear(float Channel);
@@ -170,10 +155,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 					mMyUtil[50];
 	static HDC		g_hScreenDC			= NULL;
 	static RECT		g_rcMagnify			= {0,},
-					g_rcRed				= {0,},
-					g_rcGreen			= {0,},
-					g_rcBlue			= {0,},
-					g_rcBlack			= {0,};
+					g_rcRGB				= {0,},
+					g_rcHSV			= {0,},
+					g_rcHex			= {0,};
 	static HDC		g_hMemDC			= NULL,
 					g_hDrawMemDC		= NULL,
 					g_hScreenMemDC		= NULL,
@@ -195,7 +179,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 					g_iRadius			= 0;
 	static HMONITOR	g_hCurrentMonitor	= NULL;
 
-	static const int	nEdit			= 10,
+	static const int	nEdit			= 9,
 						nList			= 1,
 						nControls		= nList + nEdit,
 						Padding			= 20;
@@ -218,7 +202,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 	POINT		Origin;
 	COLORREF	color;
 	TCHAR		HexCode[6];
-	TCHAR		Percentage[0x10];
+	TCHAR		HSVCode[0x10];
 	HMONITOR	hCurrentMonitor;
 	int x, y, Width, iWidth, Height, iHeight, iRadius, ConvertLength;
 
@@ -312,23 +296,21 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 				GetClientRect(hWnd, &crt);
 				SetRect(&g_rcMagnify, 0,0, crt.right / 5, crt.bottom / 4);
 
-				Width = Height = 24;
+				Width = 36;
+                Height = 24;
 				x = Padding * 3  + g_rcMagnify.right * 2;
 
 				y = Padding;
-				SetRect(&g_rcRed, x, y, x + Width, y + Height);
+				SetRect(&g_rcRGB, x, y, x + Width, y + Height);
 				y = Padding + (g_rcMagnify.bottom - Height) / 2;
-				SetRect(&g_rcGreen, x, y, x + Width, y + Height);
+				SetRect(&g_rcHSV, x, y, x + Width, y + Height);
 				y = Padding + g_rcMagnify.bottom - Height;
-				SetRect(&g_rcBlue, x, y, x + Width, y + Height);
+				SetRect(&g_rcHex, x, y, x + Width, y + Height);
 				int Gap = (g_rcMagnify.bottom - (Height * 3)) / 2;
 				y = Padding + g_rcMagnify.bottom + Gap;
-				SetRect(&g_rcBlack, x, y, x + Width, y + Height);
 
-				x += Padding * 2;
-				Width = (crt.right - x - (Padding * 4))/3;
-				// SetRect(&srt, x, y, Width, Height);
-				// SetWindowPos(hControls[nEdit - 1], NULL, x, y, Width, Height, SWP_NOZORDER);
+				x = g_rcRGB.right + (Padding / 2);
+				Width = (crt.right - x - (Padding / 2) * 3) / 3;
 
 				iWidth = (LOWORD(lParam) - (Padding * 2 + g_rcMagnify.right)) / 2;
 				iHeight = (HIWORD(lParam) - (y + Height + Padding)) / 2;
@@ -336,21 +318,19 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 				EllipseOrigin.x = LOWORD(lParam) - iWidth;
 				EllipseOrigin.y = HIWORD(lParam) - iHeight;
 
-				for(int i=0; i<2; i++){
-					y = Padding;
-					SetRect(&srt, x, y, Width, Height);
-					SetWindowPos(hControls[3 + (i*3)], NULL, x, y, Width, Height, SWP_NOZORDER);
+                SetRect(&srt, x, y, Width, Height);
+                for(int i=0; i<3; i++){
+                    y = Padding;
+                    SetWindowPos(hControls[i], NULL, x, y, Width, Height, SWP_NOZORDER);
 
 					y = Padding + (g_rcMagnify.bottom - Height) / 2;
-					SetRect(&srt, x, y, Width, Height);
-					SetWindowPos(hControls[4 + (i*3)], NULL, x, y, Width, Height, SWP_NOZORDER);
+                    SetWindowPos(hControls[i + 3], NULL, x, y, Width, Height, SWP_NOZORDER);
 
 					y = Padding + g_rcMagnify.bottom - Height;
-					SetRect(&srt, x, y, Width, Height);
-					SetWindowPos(hControls[5 + (i*3)], NULL, x, y, Width, Height, SWP_NOZORDER);
+                    SetWindowPos(hControls[i + 6], NULL, x, y, Width, Height, SWP_NOZORDER);
 
-					x += Width + Padding;
-				}
+                    x += Width + (Padding / 2);
+                }
 
 				x = Padding;
 				y = Padding * 2 + g_rcMagnify.bottom;
@@ -382,6 +362,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 			return 0;
 
 		case WM_SETFOCUS:
+            // 복사 가능하다는 것을 표시
 			SetFocus(hControls[0]);
 			return 0;
 
@@ -442,16 +423,17 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 									g = GetGValue(EllipseColor),
 									b = GetBValue(EllipseColor);
 
-                                // 26.01.31 : 백분율 표기 오류 발견, 수정 예정
-                                // 오래된 CMY 변환 공식을 사용하다 보니 어쩔 수 없이 발생하는 한계인 것으로 보인다.
-                                // 인쇄 색공간(감산혼합: CMYK)은 모니터 색공간과 색을 만드는 방식 자체가 달라 변환에 한계가 있다.
-                                // 현대에는 ICC 표준에 맞게 프린터기 제조업체에서 icm, icc 파일을 제작하여 같이 배포한다.
-                                // 즉, CMYK는 장치에 의존적이고 장치마다 CMYK가 전부 다 다르다
-                                // 때문에, 설계상의 문제가 있던 것이므로 이를 전면 수정하기로 한다.
-                                // 추후 시간이 되면 HSV, HSL 색 공간을 추가로 제공하기로 한다.
-
                                 #if (OBSOLETE)
                                 {
+                                    // 26.01.31 Update
+                                    // 오래된 CMY 변환 공식을 사용하다 보니 어쩔 수 없이 발생하는 한계인 것으로 보인다.
+                                    // 인쇄 색공간(감산혼합: CMYK)은 모니터 색공간과 색을 만드는 방식 자체가 달라 변환에 한계가 있다.
+                                    // 현대에는 ICC 표준에 맞게 프린터기 제조업체에서 icm, icc 파일을 제작하여 같이 배포한다.
+                                    // 즉, CMYK는 장치에 의존적이고 장치마다 CMYK가 전부 다 다르다
+                                    // 때문에, 설계상의 문제가 있던 것이므로 이를 전면 수정하기로 한다.
+                                    // 추후 시간이 되면 HSV, HSL 색 공간을 추가로 제공하기로 한다.
+
+                                    TCHAR Percentage[0x10];
                                     memset(Percentage, 0, sizeof(Percentage));
                                     MyCMYK cmyk = ToCMYKFromICC(r,g,b);
                                     StringCbPrintf(Percentage, sizeof(Percentage), L"%.2f", cmyk.C);
@@ -468,17 +450,29 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
                                 }
                                 #endif
 								
-								SetDlgItemInt(hWnd, IDC_EDSTART+3, r, FALSE);
-								SetDlgItemInt(hWnd, IDC_EDSTART+4, g, FALSE);
-								SetDlgItemInt(hWnd, IDC_EDSTART+5, b, FALSE);
+                                SetDlgItemInt(hWnd, (INT_PTR)(IDC_EDSTART), r, FALSE);
+                                SetDlgItemInt(hWnd, (INT_PTR)(IDC_EDSTART + 1), g, FALSE);
+                                SetDlgItemInt(hWnd, (INT_PTR)(IDC_EDSTART + 2), b, FALSE);
 
-								memset(HexCode, 0, sizeof(HexCode));
-								ToHex(r, HexCode, sizeof(HexCode));
-								SetDlgItemText(hWnd, IDC_EDSTART+6, HexCode); 
-								ToHex(g, HexCode, sizeof(HexCode));
-								SetDlgItemText(hWnd, IDC_EDSTART+7, HexCode); 
-								ToHex(b, HexCode, sizeof(HexCode));
-								SetDlgItemText(hWnd, IDC_EDSTART+8, HexCode); 
+                                COLORREF cColor = RGB(r,g,b);
+                                Color MyColor(cColor);
+                                MyColor.ToHSV();
+
+                                memset(HSVCode, 0, sizeof(HSVCode));
+                                ToHSVCode(MyColor._H, HSVCode, sizeof(HSVCode));
+                                SetDlgItemText(hWnd, (INT_PTR)(IDC_EDSTART + 3), HSVCode); 
+                                ToHSVCode(MyColor._S, HSVCode, sizeof(HSVCode));
+                                SetDlgItemText(hWnd, (INT_PTR)(IDC_EDSTART + 4), HSVCode); 
+                                ToHSVCode(MyColor._V, HSVCode, sizeof(HSVCode));
+                                SetDlgItemText(hWnd, (INT_PTR)(IDC_EDSTART + 5), HSVCode); 
+
+                                memset(HexCode, 0, sizeof(HexCode));
+                                ToHexCode(r, HexCode, sizeof(HexCode));
+                                SetDlgItemText(hWnd, (INT_PTR)(IDC_EDSTART + 6), HexCode); 
+                                ToHexCode(g, HexCode, sizeof(HexCode));
+                                SetDlgItemText(hWnd, (INT_PTR)(IDC_EDSTART + 7), HexCode); 
+                                ToHexCode(b, HexCode, sizeof(HexCode));
+                                SetDlgItemText(hWnd, (INT_PTR)(IDC_EDSTART + 8), HexCode); 
 
 								InvalidateRect(hWnd, NULL, FALSE);
 							}
@@ -487,7 +481,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 					break;
 
 				case IDM_PROGRAM:
-					MessageBox(hWnd, L"프로그램 소개\r\n\r\n위 프로그램은 색상값 조사에 사용되는 도구입니다.\r\n마우스 커서가 위치한 지점에서 일정한 크기의 영역을 조사하여 이미지 정보를 가져옵니다.\r\n주로, 이미지에 대한 색상 정보를 조사할 때 사용되며 추후 버전이 업데이트 되어 기능이 추가될 수 있습니다.\r\n\r\n단축키\r\n1. Ctrl + Alt + 3 : 마우스 주변 영역을 캡처합니다. \r\n2. Ctrl + Alt + 4 : 마우스 커서가 위치한 지점의 색상값을 CMYK, RGB, HEX로 변환합니다.\r\n3. Alt + 마우스 휠 : 이미지를 확대하거나 축소할 수 있습니다.\r\n\r\n※ 참고\r\n색상값을 변환할 때 최근 변환한 색상을 리스트에 기록합니다.\r\n리스트에 기록된 색상을 선택하면 타원형 이미지에 색상을 적용하여 보여줍니다.\r\n\r\n첫 번째 열: CMYK\r\n두 번째 열: RGB\r\n세 번째 열: HEX", L"ColorFromPoint", MB_OK);
+					MessageBox(hWnd, L"프로그램 소개\r\n\r\n이 프로그램은 색상값 조사에 사용되는 컬러 픽커입니다.\r\n\r\n마우스 커서를 기준으로 일정한 크기의 영역을 캡처하여\r\n이미지 정보를 가져온 후 값을 추출할 색상 위에\r\n마우스 커서를 위치시켜 단축키로 색상을 추출할 수 있습니다.\r\n색상 추출은 픽셀 단위로만 가능합니다.\r\n\r\n단축키\r\n• Ctrl + Alt + 3 : 마우스 주변 영역을 캡처합니다. \r\n• Ctrl + Alt + 4 : 마우스 커서가 위치한 지점의 색상값을 추출합니다.\r\n• Alt + Wheel Up(Down) : 이미지를 확대하거나 축소할 수 있습니다.\r\n\r\nHSV\r\n위 프로그램에서 HSV는 [0,1]로 정규화된 범위를 갖습니다.\r\n\r\n• 색상(H) : 360°를 곱하여 색상각을 구할 수 있습니다.\r\n• 채도(S) : 100을 곱하여 백분율 값을 구할 수 있습니다.\r\n• 명도(V) : 100을 곱하여 백분율 값을 구할 수 있습니다.\r\n\r\n※ 참고\r\n색상값을 변환할 때 최근 변환한 색상을 리스트에 기록합니다.\r\n리스트에 기록된 색상을 선택하면 타원형 이미지에 색상을 적용하여 보여줍니다.", L"ColorFromPoint", MB_OK);
 					break;
 
 				case IDM_LINE:
@@ -613,33 +607,25 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 							DrawBitmap(g_hMemDC, srt.left, srt.top, g_hMagnifyCaptureBitmap);
 						}
 
-						DrawEdge(g_hMemDC, &g_rcRed, EDGE_SUNKEN, BF_RECT);
-						DrawEdge(g_hMemDC, &g_rcGreen, EDGE_SUNKEN, BF_RECT);
-						DrawEdge(g_hMemDC, &g_rcBlue, EDGE_SUNKEN, BF_RECT);
-						// DrawEdge(g_hMemDC, &g_rcBlack, EDGE_SUNKEN, BF_RECT);
+						DrawEdge(g_hMemDC, &g_rcRGB, EDGE_SUNKEN, BF_RECT);
+						DrawEdge(g_hMemDC, &g_rcHSV, EDGE_SUNKEN, BF_RECT);
+						DrawEdge(g_hMemDC, &g_rcHex, EDGE_SUNKEN, BF_RECT);
 
                         int BkMode = SetBkMode(g_hMemDC, TRANSPARENT);
-						CopyRect(&srt, &g_rcRed);
+						CopyRect(&srt, &g_rcRGB);
 						InflateRect(&srt, -EDGEFRAME, -EDGEFRAME);
-						FillRect(g_hMemDC, &srt, hRedBrush);
-                        DrawText(g_hMemDC, L"R", -1, &g_rcRed, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+						// FillRect(g_hMemDC, &srt, hRedBrush);
+                        DrawText(g_hMemDC, L"RGB", -1, &g_rcRGB, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
-						CopyRect(&srt, &g_rcGreen);
+						CopyRect(&srt, &g_rcHSV);
 						InflateRect(&srt, -EDGEFRAME, -EDGEFRAME);
-						FillRect(g_hMemDC, &srt, hGreenBrush);
-                        DrawText(g_hMemDC, L"G", -1, &g_rcGreen, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+						// FillRect(g_hMemDC, &srt, hGreenBrush);
+                        DrawText(g_hMemDC, L"HSV", -1, &g_rcHSV, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
-						CopyRect(&srt, &g_rcBlue);
+						CopyRect(&srt, &g_rcHex);
 						InflateRect(&srt, -EDGEFRAME, -EDGEFRAME);
-						FillRect(g_hMemDC, &srt, hBlueBrush);
-                        DrawText(g_hMemDC, L"B", -1, &g_rcBlue, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-
-                        #if (OBSOLETE)
-						CopyRect(&srt, &g_rcBlack);
-						InflateRect(&srt, -EDGEFRAME, -EDGEFRAME);
-						FillRect(g_hMemDC, &srt, hBlackBrush);
-                        DrawText(g_hMemDC, L"K", -1, &g_rcBlack, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-                        #endif
+						// FillRect(g_hMemDC, &srt, hBlueBrush);
+                        DrawText(g_hMemDC, L"HEX", -1, &g_rcHex, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
                         SetBkMode(g_hMemDC, BkMode);
 						HBRUSH hEllipseBrush = CreateSolidBrush(EllipseColor),
@@ -826,9 +812,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 				HWND hPrevFocus		= (HWND)lParam;
 				WPARAM KeyCode		= wParam;
 
-				int	Next,
-					Half = nEdit / 2,
-					adjusted = nEdit - 1;
+                #if (OBSOLETE)
 					
 				for(int i=0; i<nEdit; i++){
 					if(hControls[i] == hPrevFocus){
@@ -849,10 +833,44 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 								Next = (i + 1) % adjusted;
 							}
 						}
-
-						SetFocus(hControls[Next]);
-					}
+                    }
+                    
 				}
+                #endif
+
+                // 0 : LShift + Tab
+                // 1 : Tab
+                // 2 : Up
+                // 3 : Down
+                int Prev = -1,
+                    Next = -1;
+
+                for(int i=0; i<nEdit; i++){
+                    if(hControls[i] == hPrevFocus){
+                        Prev = i;
+                        break;
+                    }
+                }
+
+                switch(KeyCode){
+                    case 0:
+                        Next = (Prev - 1 + nEdit) % nEdit;
+                        break;
+
+                    case 1:
+                        Next = (Prev + 1) % nEdit;
+                        break;
+
+                    case 2:
+                        Next = (Prev - 3 + nEdit) % nEdit;
+                        break;
+
+                    case 3:
+                        Next = (Prev + 3) % nEdit;
+                        break;
+                }
+
+                SetFocus(hControls[Next]);
 			}
 			return 0;
 
@@ -1006,12 +1024,16 @@ void ErrorMessage(LPCTSTR msg, ...){
 	LocalFree(lpMsgBuf);
 }
 
-void ToHex(COLORREF color, LPTSTR ret, int Size){
+void ToHexCode(COLORREF color, LPTSTR ret, int Size){
 	StringCbPrintf(ret, Size, L"%02X%02X%02X", GetRValue(color), GetGValue(color), GetBValue(color));
 }
 
-void ToHex(int Value, LPTSTR ret, int Size){
+void ToHexCode(int Value, LPTSTR ret, int Size){
 	StringCbPrintf(ret, Size, L"%02X", Value);
+}
+
+void ToHSVCode(float Value, LPTSTR ret, int Size){
+    StringCbPrintf(ret, Size, L"%05.4f", Value);
 }
 
 COLORREF ToCOLORREF(LPCTSTR HexCode){
@@ -1193,6 +1215,27 @@ void DebugMessage(LPCWSTR fmt, ...){
 }
 
 #if (OBSOLETE) 
+MyCMY GetCMY(MyRGB rgb, float K);
+MyCMYK ToCMYK(int r, int g, int b);
+MyCMYK ToCMYKFromICC(int r, int g, int b);
+MyRGB ToRGB(MyCMYK cmyk);
+COLORREF ToCOLORREF(MyCMYK cmyk);
+HBRUSH CreateCMYKBrush(MyCMYK cmyk);
+void ToHexCode(MyCMYK cmyk, LPTSTR ret, int Size);
+
+typedef struct tag_MyCMY{
+	float C;
+	float M;
+	float Y;
+}MyCMY;
+
+typedef struct tag_MyCMYK{
+	float C;
+	float M;
+	float Y;
+	float K;
+}MyCMYK;
+
 float MyGetKValue(MyRGB rgb) {
     // K = 1 - max(R',G',B')
 
@@ -1283,7 +1326,7 @@ HBRUSH CreateCMYKBrush(MyCMYK cmyk){
     return CreateSolidBrush(color);
 }
 
-void ToHex(MyCMYK cmyk, LPTSTR ret, int Size){
+void ToHexCode(MyCMYK cmyk, LPTSTR ret, int Size){
     COLORREF color = ToCOLORREF(cmyk);
     StringCbPrintf(ret, Size, L"%02X%02X%02X", GetRValue(color), GetGValue(color), GetBValue(color));
 }
