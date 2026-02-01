@@ -49,7 +49,21 @@
 
 // Update 26.02.01
 // 이전 프로젝트에서 만들어 둔 Color 클래스를 추가했다.
-// COLORREF와 HSV간 변환을 수행하는 클래스이며 변환 생성자와 전역 연산자 오버로딩을 이용해 캡슐화했다.
+// RGB와 HSV간 변환을 수행하는 클래스이며 변환 생성자와 전역 연산자 오버로딩을 이용해 캡슐화했다.
+
+// Update 26.02.01
+// 웹까지 고려하여 HSL 색 공간도 추가하기로 결정했다.
+// CSS에서 기본적으로 HSLA 색상 모델을 사용하기 때문에 확장한 김에 같이 해두는 것이 좋을 것 같다.
+// HSL은 명도(L)를 기준으로 색을 표현함으로써 채도를 더 자연스럽게 조절하는 모델이다.
+// 주로 웹에서 사용되며 HSV 모델과는 약간의 차이가 있다.
+// HSV는 그래픽 툴(Photoshop)이나 게임(조명/광원 색상 변환, 그라데이션), 컴퓨터 비전(OpenCV) 등에서 쓰이는데
+// HSV의 명도(V)는 일반적으로 생각하는 밝기(빛의 밝기)가 아니라 색의 밝기(색의 강도)를 나타낸다.
+// 반면 HSL의 명도(L)는 우리가 일반적으로 생각하는 밝기(빛의 밝기)를 나타낸다고 볼 수 있다.
+// OpenCV를 써본 사람은 특히 이해하기 쉬울 것이다.
+// HSV에서 밝기를 조절하는 경우 밝아진다는 느낌보다는 색이 강렬해진다는 느낌을 준다.
+// 애초에 그렇게 설계된 모델이지만 이로인해 톤 변화가 부자연스러워 약간의 괴리감이 있다.
+// 이를 해결한 모델이 HSL이라고 생각하면 되며 명도(L)를 기준으로하여 채도(S, 색의 순도)를 결정한다.
+// 변환식을 보면 색의 범위(Delta)를 명도(L)에 맞춰 보정한 값을 채도(S)로 쓴다는 것을 알 수 있다.
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK EditProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam);
@@ -135,13 +149,17 @@ typedef struct tag_MyRGB{
 void ToHexCode(COLORREF color, LPTSTR ret, int Size);
 void ToHexCode(int Value, LPTSTR ret, int Size);
 void ToHSVCode(float Value, LPTSTR ret, int Size);
+void ToHSLCode(float Value, LPTSTR ret, int Size);
+
 COLORREF ToCOLORREF(LPCTSTR HexCode);
 MyRGB Normalize(COLORREF color);
 MyRGB Normalize(int r, int g, int b);
+
 float MyGetKValue(MyRGB rgb);
 float LinearToSRGB(float Channel);
-MyRGB ConvertToSRGB(MyRGB rgb);
 float SRGBToLinear(float Channel);
+
+MyRGB ConvertToSRGB(MyRGB rgb);
 MyRGB ConvertToLinearRGB(MyRGB srgb);
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam){
@@ -156,8 +174,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 	static HDC		g_hScreenDC			= NULL;
 	static RECT		g_rcMagnify			= {0,},
 					g_rcRGB				= {0,},
-					g_rcHSV			= {0,},
-					g_rcHex			= {0,};
+					g_rcHSV			    = {0,},
+					g_rcHSL			    = {0,},
+					g_rcHex			    = {0,};
 	static HDC		g_hMemDC			= NULL,
 					g_hDrawMemDC		= NULL,
 					g_hScreenMemDC		= NULL,
@@ -179,7 +198,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 					g_iRadius			= 0;
 	static HMONITOR	g_hCurrentMonitor	= NULL;
 
-	static const int	nEdit			= 9,
+	static const int	nEdit			= 12,
 						nList			= 1,
 						nControls		= nList + nEdit,
 						Padding			= 20;
@@ -203,6 +222,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 	COLORREF	color;
 	TCHAR		HexCode[6];
 	TCHAR		HSVCode[0x10];
+	TCHAR		HSLCode[0x10];
 	HMONITOR	hCurrentMonitor;
 	int x, y, Width, iWidth, Height, iHeight, iRadius, ConvertLength;
 
@@ -305,9 +325,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 				y = Padding + (g_rcMagnify.bottom - Height) / 2;
 				SetRect(&g_rcHSV, x, y, x + Width, y + Height);
 				y = Padding + g_rcMagnify.bottom - Height;
-				SetRect(&g_rcHex, x, y, x + Width, y + Height);
+				SetRect(&g_rcHSL, x, y, x + Width, y + Height);
 				int Gap = (g_rcMagnify.bottom - (Height * 3)) / 2;
 				y = Padding + g_rcMagnify.bottom + Gap;
+                SetRect(&g_rcHex, x, y, x + Width, y + Height);
 
 				x = g_rcRGB.right + (Padding / 2);
 				Width = (crt.right - x - (Padding / 2) * 3) / 3;
@@ -328,6 +349,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 
 					y = Padding + g_rcMagnify.bottom - Height;
                     SetWindowPos(hControls[i + 6], NULL, x, y, Width, Height, SWP_NOZORDER);
+
+                    y = Padding + g_rcMagnify.bottom + Gap;
+                    SetWindowPos(hControls[i + 9], NULL, x, y, Width, Height, SWP_NOZORDER);
 
                     x += Width + (Padding / 2);
                 }
@@ -450,14 +474,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
                                 }
                                 #endif
 								
-                                SetDlgItemInt(hWnd, (INT_PTR)(IDC_EDSTART), r, FALSE);
+                                SetDlgItemInt(hWnd, (INT_PTR)(IDC_EDSTART + 0), r, FALSE);
                                 SetDlgItemInt(hWnd, (INT_PTR)(IDC_EDSTART + 1), g, FALSE);
                                 SetDlgItemInt(hWnd, (INT_PTR)(IDC_EDSTART + 2), b, FALSE);
 
                                 COLORREF cColor = RGB(r,g,b);
                                 Color MyColor(cColor);
-                                MyColor.ToHSV();
 
+                                MyColor.ToHSV();
                                 memset(HSVCode, 0, sizeof(HSVCode));
                                 ToHSVCode(MyColor._H, HSVCode, sizeof(HSVCode));
                                 SetDlgItemText(hWnd, (INT_PTR)(IDC_EDSTART + 3), HSVCode); 
@@ -466,13 +490,22 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
                                 ToHSVCode(MyColor._V, HSVCode, sizeof(HSVCode));
                                 SetDlgItemText(hWnd, (INT_PTR)(IDC_EDSTART + 5), HSVCode); 
 
+                                MyColor.ToHSL();
+                                memset(HSVCode, 0, sizeof(HSLCode));
+                                ToHSLCode(MyColor._H, HSLCode, sizeof(HSLCode));
+                                SetDlgItemText(hWnd, (INT_PTR)(IDC_EDSTART + 6), HSLCode); 
+                                ToHSLCode(MyColor._S, HSLCode, sizeof(HSLCode));
+                                SetDlgItemText(hWnd, (INT_PTR)(IDC_EDSTART + 7), HSLCode); 
+                                ToHSLCode(MyColor._L, HSLCode, sizeof(HSLCode));
+                                SetDlgItemText(hWnd, (INT_PTR)(IDC_EDSTART + 8), HSLCode); 
+
                                 memset(HexCode, 0, sizeof(HexCode));
                                 ToHexCode(r, HexCode, sizeof(HexCode));
-                                SetDlgItemText(hWnd, (INT_PTR)(IDC_EDSTART + 6), HexCode); 
+                                SetDlgItemText(hWnd, (INT_PTR)(IDC_EDSTART + 9), HexCode); 
                                 ToHexCode(g, HexCode, sizeof(HexCode));
-                                SetDlgItemText(hWnd, (INT_PTR)(IDC_EDSTART + 7), HexCode); 
+                                SetDlgItemText(hWnd, (INT_PTR)(IDC_EDSTART + 10), HexCode); 
                                 ToHexCode(b, HexCode, sizeof(HexCode));
-                                SetDlgItemText(hWnd, (INT_PTR)(IDC_EDSTART + 8), HexCode); 
+                                SetDlgItemText(hWnd, (INT_PTR)(IDC_EDSTART + 11), HexCode); 
 
 								InvalidateRect(hWnd, NULL, FALSE);
 							}
@@ -481,7 +514,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 					break;
 
 				case IDM_PROGRAM:
-					MessageBox(hWnd, L"프로그램 소개\r\n\r\n이 프로그램은 색상값 조사에 사용되는 컬러 픽커입니다.\r\n\r\n마우스 커서를 기준으로 일정한 크기의 영역을 캡처하여\r\n이미지 정보를 가져온 후 값을 추출할 색상 위에\r\n마우스 커서를 위치시켜 단축키로 색상을 추출할 수 있습니다.\r\n색상 추출은 픽셀 단위로만 가능합니다.\r\n\r\n단축키\r\n• Ctrl + Alt + 3 : 마우스 주변 영역을 캡처합니다. \r\n• Ctrl + Alt + 4 : 마우스 커서가 위치한 지점의 색상값을 추출합니다.\r\n• Alt + Wheel Up(Down) : 이미지를 확대하거나 축소할 수 있습니다.\r\n\r\nHSV\r\n위 프로그램에서 HSV는 [0,1]로 정규화된 범위를 갖습니다.\r\n\r\n• 색상(H) : 360°를 곱하여 색상각을 구할 수 있습니다.\r\n• 채도(S) : 100을 곱하여 백분율 값을 구할 수 있습니다.\r\n• 명도(V) : 100을 곱하여 백분율 값을 구할 수 있습니다.\r\n\r\n※ 참고\r\n색상값을 변환할 때 최근 변환한 색상을 리스트에 기록합니다.\r\n리스트에 기록된 색상을 선택하면 타원형 이미지에 색상을 적용하여 보여줍니다.", L"ColorFromPoint", MB_OK);
+					MessageBox(hWnd, L"프로그램 소개\r\n\r\n이 프로그램은 색상값 조사에 사용되는 컬러 픽커입니다.\r\n\r\n마우스 커서를 기준으로 일정한 크기의 영역을 캡처하여\r\n이미지 정보를 가져온 후 값을 추출할 색상 위에\r\n마우스 커서를 위치시켜 단축키로 색상을 추출할 수 있습니다.\r\n색상 추출은 픽셀 단위로만 가능합니다.\r\n\r\n단축키\r\n• Ctrl + Alt + 3 : 마우스 주변 영역을 캡처합니다. \r\n• Ctrl + Alt + 4 : 마우스 커서가 위치한 지점의 색상값을 추출합니다.\r\n• Alt + Wheel Up(Down) : 이미지를 확대하거나 축소할 수 있습니다.\r\n\r\nHSV / HSL\r\n위 프로그램에서 HSV / HSL은 [0,1]로 정규화된 범위를 갖습니다.\r\n\r\n• 색상(H) : 360°를 곱하여 색상각을 구할 수 있습니다.\r\n• 채도(S) : 100을 곱하여 백분율 값을 구할 수 있습니다.\r\n• 명도(V/L) : 100을 곱하여 백분율 값을 구할 수 있습니다.\r\n\r\n※ 참고\r\n색상값을 변환할 때 최근 변환한 색상을 리스트에 기록합니다.\r\n리스트에 기록된 색상을 선택하면 타원형 이미지에 색상을 적용하여 보여줍니다.", L"ColorFromPoint", MB_OK);
 					break;
 
 				case IDM_LINE:
@@ -609,22 +642,24 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 
 						DrawEdge(g_hMemDC, &g_rcRGB, EDGE_SUNKEN, BF_RECT);
 						DrawEdge(g_hMemDC, &g_rcHSV, EDGE_SUNKEN, BF_RECT);
+						DrawEdge(g_hMemDC, &g_rcHSL, EDGE_SUNKEN, BF_RECT);
 						DrawEdge(g_hMemDC, &g_rcHex, EDGE_SUNKEN, BF_RECT);
 
                         int BkMode = SetBkMode(g_hMemDC, TRANSPARENT);
 						CopyRect(&srt, &g_rcRGB);
 						InflateRect(&srt, -EDGEFRAME, -EDGEFRAME);
-						// FillRect(g_hMemDC, &srt, hRedBrush);
                         DrawText(g_hMemDC, L"RGB", -1, &g_rcRGB, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
 						CopyRect(&srt, &g_rcHSV);
 						InflateRect(&srt, -EDGEFRAME, -EDGEFRAME);
-						// FillRect(g_hMemDC, &srt, hGreenBrush);
                         DrawText(g_hMemDC, L"HSV", -1, &g_rcHSV, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+
+						CopyRect(&srt, &g_rcHSL);
+						InflateRect(&srt, -EDGEFRAME, -EDGEFRAME);
+                        DrawText(g_hMemDC, L"HSL", -1, &g_rcHSL, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
 						CopyRect(&srt, &g_rcHex);
 						InflateRect(&srt, -EDGEFRAME, -EDGEFRAME);
-						// FillRect(g_hMemDC, &srt, hBlueBrush);
                         DrawText(g_hMemDC, L"HEX", -1, &g_rcHex, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
                         SetBkMode(g_hMemDC, BkMode);
@@ -811,32 +846,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 			{
 				HWND hPrevFocus		= (HWND)lParam;
 				WPARAM KeyCode		= wParam;
-
-                #if (OBSOLETE)
-					
-				for(int i=0; i<nEdit; i++){
-					if(hControls[i] == hPrevFocus){
-						if(KeyCode == 0 || KeyCode == 2){
-							if(i == 3){
-								Next = 9;
-							}else if(i == 9){
-								Next = 2;
-							}else{
-								Next = (i - 1 + adjusted) % adjusted;
-							}
-						}else{
-							if(i == 2){
-								Next = 9;
-							}else if(i == 9){
-								Next = 3;
-							}else{
-								Next = (i + 1) % adjusted;
-							}
-						}
-                    }
-                    
-				}
-                #endif
 
                 // 0 : LShift + Tab
                 // 1 : Tab
@@ -1036,6 +1045,10 @@ void ToHSVCode(float Value, LPTSTR ret, int Size){
     StringCbPrintf(ret, Size, L"%05.4f", Value);
 }
 
+void ToHSLCode(float Value, LPTSTR ret, int Size){
+    StringCbPrintf(ret, Size, L"%05.4f", Value);
+}
+
 COLORREF ToCOLORREF(LPCTSTR HexCode){
 	TCHAR* ptr = (TCHAR*)HexCode;
 	if(ptr[0] == '#'){ ptr++; }
@@ -1082,7 +1095,6 @@ MyRGB Normalize(COLORREF color){
 }
 
 MyRGB Normalize(int r, int g, int b){
-	// 0 ~ 1 : Normalization
 
 	MyRGB rgb;
 	rgb.R = max(0.0f, min(1.0f, r / 255.f));
