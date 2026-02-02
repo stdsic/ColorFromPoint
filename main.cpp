@@ -1,4 +1,4 @@
-#define _DEBUG
+// #define _DEBUG
 #define _WIN32_WINNT 0x0A00
 #include <windows.h>
 #include <winspool.h>
@@ -76,75 +76,74 @@ bool IsColorDark(COLORREF color);
 BOOL DrawBitmap(HDC hdc, int x, int y, HBITMAP hBitmap);
 void ErrorMessage(LPCTSTR msg, ...);
 void DebugMessage(LPCWSTR fmt, ...);
-HBITMAP Convert(HDC hdc, HBITMAP hBitmap, int iWidth, int iHeight);
 
 int APIENTRY wWinMain(HINSTANCE hInst, HINSTANCE, LPWSTR, int nCmdShow){
-    HANDLE hMutex;
-    hMutex = CreateMutex(NULL, FALSE, L"MyColorFromPointMutex");
+	HANDLE hMutex;
+	hMutex = CreateMutex(NULL, FALSE, L"MyColorFromPointMutex");
 
-    if(GetLastError() == ERROR_ALREADY_EXISTS){
-        CloseHandle(hMutex);
-        HWND hOnce = FindWindow(CLASS_NAME, NULL);
-        if(hOnce){
-            ShowWindowAsync(hOnce, SW_SHOWNORMAL);
-            SetForegroundWindow(hOnce);
-        }
-        return 0;
-    }
+	if(GetLastError() == ERROR_ALREADY_EXISTS){
+		CloseHandle(hMutex);
+		HWND hOnce = FindWindow(CLASS_NAME, NULL);
+		if(hOnce){
+			ShowWindowAsync(hOnce, SW_SHOWNORMAL);
+			SetForegroundWindow(hOnce);
+		}
+		return 0;
+	}
 
 #ifdef _DEBUG
     AllocConsole();
 #endif
 
-    WNDCLASS wc = {
-        CS_HREDRAW | CS_VREDRAW,
-        WndProc,
-        0,0,
-        hInst,
-        NULL, LoadCursor(NULL, IDC_ARROW),
-        NULL,
-        NULL,
-        CLASS_NAME
-    };
-    RegisterClass(&wc);
+	WNDCLASS wc = {
+		CS_HREDRAW | CS_VREDRAW,
+		WndProc,
+		0,0,
+		hInst,
+		NULL, LoadCursor(NULL, IDC_ARROW),
+		NULL,
+		NULL,
+		CLASS_NAME
+	};
+	RegisterClass(&wc);
 
-    DWORD	dwStyle		= WS_OVERLAPPED,
-            dwExStyle	= WS_EX_CLIENTEDGE;
+	DWORD	dwStyle		= WS_OVERLAPPED,
+			dwExStyle	= WS_EX_CLIENTEDGE;
 
-    RECT crt;
-    SetRect(&crt, 0,0, 500, 400);
-    AdjustWindowRectEx(&crt, dwStyle, FALSE, dwExStyle);
+	RECT crt;
+	SetRect(&crt, 0,0, 500, 400);
+	AdjustWindowRectEx(&crt, dwStyle, FALSE, dwExStyle);
 
-    SetWindowCenter(NULL, NULL, &crt);
+	SetWindowCenter(NULL, NULL, &crt);
 
-    HWND hWnd = CreateWindowEx(
-            WS_EX_CLIENTEDGE,
-            CLASS_NAME,
-            CLASS_NAME,
-            WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
-            crt.left, crt.top, crt.right, crt.bottom,
-            NULL,
-            (HMENU)NULL,
-            hInst,
-            NULL
-            );
+	HWND hWnd = CreateWindowEx(
+			WS_EX_CLIENTEDGE,
+			CLASS_NAME,
+			CLASS_NAME,
+			WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
+			crt.left, crt.top, crt.right, crt.bottom,
+			NULL,
+			(HMENU)NULL,
+			hInst,
+			NULL
+			);
 
-    ShowWindow(hWnd, nCmdShow);
+	ShowWindow(hWnd, nCmdShow);
 
-    MSG msg;
-    while(GetMessage(&msg, nullptr, 0,0)){
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
-    }
+	MSG msg;
+	while(GetMessage(&msg, nullptr, 0,0)){
+		TranslateMessage(&msg);
+		DispatchMessage(&msg);
+	}
 
     FreeConsole();
-    return (int)msg.wParam;
+	return (int)msg.wParam;
 }
 
 typedef struct tag_MyRGB{
-    float R;
-    float G;
-    float B;
+	float R;
+	float G;
+	float B;
 }MyRGB;
 
 void ToHexCode(COLORREF color, LPTSTR ret, int Size);
@@ -164,213 +163,191 @@ MyRGB ConvertToSRGB(MyRGB rgb);
 MyRGB ConvertToLinearRGB(MyRGB srgb);
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam){
-    const wchar_t	*wMyDll				= L"MyApiDll.dll",
-          *wMyMouseProc		= L"MyMouseProc",
-          *wMyKeyboardProc	= L"MyKeyboardProc",
-          *wMyUtil			= L"MyInit";
-    char			mMyDll[50],
-    mMyMouseProc[50],
-    mMyKeyboardProc[50],
-    mMyUtil[50];
-    static HDC		g_hScreenDC			= NULL;
-    static RECT		g_rcMagnify			= {0,},
-                    g_rcRGB				= {0,},
-                    g_rcHSV			    = {0,},
-                    g_rcHSL			    = {0,},
-                    g_rcHex			    = {0,};
-    static HDC		g_hMemDC			= NULL,
-                    g_hDrawMemDC		= NULL,
-                    g_hScreenMemDC		= NULL,
-                    g_hCaptureMemDC		= NULL;
-    static HBITMAP	g_hBitmap			= NULL,
-                    g_hDrawBitmap		= NULL,
-                    g_hScreenBitmap		= NULL,
-                    g_hMagnifyCaptureBitmap = NULL;
-    static HHOOK	g_hMouse			= NULL,
-                    g_hKeyboard			= NULL;
-    static HMODULE	g_hModule			= NULL;
-    static HOOKPROC	g_lpfnMouseProc		= NULL,
-                    g_lpfnKeyboardProc	= NULL;
-    static float	g_Rate				= 2.0,
-                    g_XScale			= 1.0,
-                    g_YScale			= 1.0;
-    static int		g_X					= 0,
-                    g_Y					= 0,
-                    g_iRadius			= 0;
-    static HMONITOR	g_hCurrentMonitor	= NULL;
+	const wchar_t	*wMyDll				= L"MyApiDll.dll",
+					*wMyMouseProc		= L"MyMouseProc",
+					*wMyKeyboardProc	= L"MyKeyboardProc",
+					*wMyUtil			= L"MyInit";
+	char			mMyDll[50],
+					mMyMouseProc[50],
+					mMyKeyboardProc[50],
+					mMyUtil[50];
+	static HDC		g_hScreenDC			= NULL;
+	static RECT		g_rcMagnify			= {0,},
+					g_rcRGB				= {0,},
+					g_rcHSV			    = {0,},
+					g_rcHSL			    = {0,},
+					g_rcHex			    = {0,};
+	static HDC		g_hMemDC			= NULL,
+					g_hDrawMemDC		= NULL,
+					g_hScreenMemDC		= NULL,
+					g_hCaptureMemDC		= NULL;
+	static HBITMAP	g_hBitmap			= NULL,
+					g_hDrawBitmap		= NULL,
+					g_hScreenBitmap		= NULL,
+					g_hMagnifyCaptureBitmap = NULL;
+	static HHOOK	g_hMouse			= NULL,
+					g_hKeyboard			= NULL;
+	static HMODULE	g_hModule			= NULL;
+	static HOOKPROC	g_lpfnMouseProc		= NULL,
+					g_lpfnKeyboardProc	= NULL;
+	static float	g_Rate				= 2.0,
+					g_XScale			= 1.0,
+					g_YScale			= 1.0;
+	static int		g_X					= 0,
+					g_Y					= 0,
+					g_iRadius			= 0;
+	static HMONITOR	g_hCurrentMonitor	= NULL;
 
-    static const int	nEdit			= 12,
-                 nList			= 1,
-                 nControls		= nList + nEdit,
-                 Padding			= 20;
+	static const int	nEdit			= 12,
+						nList			= 1,
+						nControls		= nList + nEdit,
+						Padding			= 20;
 
-    static HWND		hControls[nControls];
-    static WNDPROC	OldEditProc;
+	static HWND		hControls[nControls];
+	static WNDPROC	OldEditProc;
 
-    static HBRUSH hRedBrush, hGreenBrush, hBlueBrush, hBlackBrush;
-    static COLORREF SelectColor, EllipseColor;
-    static POINT Mouse, EllipseOrigin;
-    static HPEN hWhitePen, hBlackPen;
-    static BOOL bLine;
+	static HBRUSH hRedBrush, hGreenBrush, hBlueBrush, hBlackBrush;
+	static COLORREF SelectColor, EllipseColor;
+	static POINT Mouse, EllipseOrigin;
+	static HPEN hWhitePen, hBlackPen;
+	static BOOL bLine;
 
-    void (*pInit)(HWND, HHOOK, HHOOK)	= NULL;
+	void (*pInit)(HWND, HHOOK, HHOOK)	= NULL;
 
-    RECT	crt, wrt, srt;
-    BITMAP	bmp;
-    DWORD	dwStyle, dwExStyle;
+	RECT	crt, wrt, srt;
+	BITMAP	bmp;
+	DWORD	dwStyle, dwExStyle;
 
-    POINT		Origin;
-    COLORREF	color;
-    TCHAR		HexCode[6];
-    TCHAR		HSVCode[0x10];
-    TCHAR		HSLCode[0x10];
-    HMONITOR	hCurrentMonitor;
-    int x, y, Width, iWidth, Height, iHeight, iRadius, ConvertLength;
+	POINT		Origin;
+	COLORREF	color;
+	TCHAR		HexCode[6];
+	TCHAR		HSVCode[0x10];
+	TCHAR		HSLCode[0x10];
+	HMONITOR	hCurrentMonitor;
+	int x, y, Width, iWidth, Height, iHeight, iRadius, ConvertLength;
 
-    WNDCLASS wc;
-    HDC hdc;
+	WNDCLASS wc;
+	HDC hdc;
 
-    HMENU hMenu, hPopupMenu;
+	HMENU hMenu, hPopupMenu;
 
-    static CHAR *ConvertICMPath;
-    static WCHAR ICMPath[MAX_PATH];
+	switch(iMessage){
+		case WM_CREATE:
+			try{
+				g_hModule = LoadLibrary(wMyDll);
+				if(g_hModule == NULL){ throw 1; }
 
-    static cmsHPROFILE sRGB;
-    static cmsHPROFILE Monitor;
-    static cmsHTRANSFORM Transform;
+				ConvertLength = WideCharToMultiByte(CP_ACP, 0, wMyMouseProc, -1, NULL, 0, NULL, NULL);
+				WideCharToMultiByte(CP_ACP, 0, wMyMouseProc, -1, mMyMouseProc, ConvertLength, NULL, NULL);
+				g_lpfnMouseProc = (HOOKPROC)GetProcAddress(g_hModule, mMyMouseProc);
+				if(g_lpfnMouseProc == NULL){ throw 2; }
 
-    int Length;
-    int Stride;
-    int BytesPerPixel;
-    int PixelCount;
-    int BufferSize;
+				g_hMouse = SetWindowsHookEx(WH_MOUSE_LL, g_lpfnMouseProc,g_hModule, 0);
+				if(g_hMouse == NULL){ throw 3; }
 
-    BITMAPINFO bmi;
-    BITMAPINFO nbmi;
+				ConvertLength = WideCharToMultiByte(CP_ACP, 0, wMyKeyboardProc, -1, NULL, 0, NULL, NULL);
+				WideCharToMultiByte(CP_ACP, 0, wMyKeyboardProc, -1, mMyKeyboardProc, ConvertLength, NULL, NULL);
+				g_lpfnKeyboardProc = (HOOKPROC)GetProcAddress(g_hModule, mMyKeyboardProc);
+				if(g_lpfnKeyboardProc == NULL){ throw 4; }
 
-    static BYTE *PrevBuffer;
-    static BYTE *Buffer;
-    static void *pRaster;
-    static BYTE *pBits;
-    static HBITMAP hNewBitmap;
+				g_hKeyboard = SetWindowsHookEx(WH_KEYBOARD_LL, g_lpfnKeyboardProc,g_hModule, 0);
+				if(g_hKeyboard == NULL){ throw 5; }
 
-    switch(iMessage){
-        case WM_CREATE:
-            try{
-                g_hModule = LoadLibrary(wMyDll);
-                if(g_hModule == NULL){ throw 1; }
+				ConvertLength = WideCharToMultiByte(CP_ACP, 0, wMyUtil, -1, NULL, 0, NULL, NULL);
+				WideCharToMultiByte(CP_ACP, 0, wMyUtil, -1, mMyUtil, ConvertLength, NULL, NULL);
+				pInit = (void (*)(HWND, HHOOK, HHOOK))GetProcAddress(g_hModule, mMyUtil);
+				if(pInit == NULL){ throw 6; }
+				(*pInit)(hWnd, g_hMouse, g_hKeyboard);
 
-                ConvertLength = WideCharToMultiByte(CP_ACP, 0, wMyMouseProc, -1, NULL, 0, NULL, NULL);
-                WideCharToMultiByte(CP_ACP, 0, wMyMouseProc, -1, mMyMouseProc, ConvertLength, NULL, NULL);
-                g_lpfnMouseProc = (HOOKPROC)GetProcAddress(g_hModule, mMyMouseProc);
-                if(g_lpfnMouseProc == NULL){ throw 2; }
+			} catch (const int err){
+				ErrorMessage(L"Init Failed");
+				if(err != 1){
+					FreeLibrary(g_hModule);
+				}
+				return -1;
+			}
 
-                g_hMouse = SetWindowsHookEx(WH_MOUSE_LL, g_lpfnMouseProc,g_hModule, 0);
-                if(g_hMouse == NULL){ throw 3; }
+			SetRect(&g_rcMagnify, 0,0, 100, 100);
 
-                ConvertLength = WideCharToMultiByte(CP_ACP, 0, wMyKeyboardProc, -1, NULL, 0, NULL, NULL);
-                WideCharToMultiByte(CP_ACP, 0, wMyKeyboardProc, -1, mMyKeyboardProc, ConvertLength, NULL, NULL);
-                g_lpfnKeyboardProc = (HOOKPROC)GetProcAddress(g_hModule, mMyKeyboardProc);
-                if(g_lpfnKeyboardProc == NULL){ throw 4; }
+			color = ToCOLORREF(L"#c92519");
+			hRedBrush = CreateSolidBrush(color);
+			color = ToCOLORREF(L"#00A86B");
+			hGreenBrush = CreateSolidBrush(color);
+			color = ToCOLORREF(L"#0080ff");
+			hBlueBrush = CreateSolidBrush(color);
+			hBlackBrush = CreateSolidBrush(RGB(54, 69, 79));
 
-                g_hKeyboard = SetWindowsHookEx(WH_KEYBOARD_LL, g_lpfnKeyboardProc,g_hModule, 0);
-                if(g_hKeyboard == NULL){ throw 5; }
+			GetClassInfo(NULL, L"edit", &wc);
+			wc.hInstance		= GetModuleHandle(NULL);
+			wc.lpszClassName	= L"MyEditClass";
+			OldEditProc			= wc.lpfnWndProc;
+			wc.lpfnWndProc		= (WNDPROC)EditProc;
+			RegisterClass(&wc);
+			SetProp(hWnd, L"MyEditClassProc", (HANDLE)OldEditProc);
+			for(int i=0; i<nEdit; i++){
+				hControls[i] = CreateWindowEx(WS_EX_CLIENTEDGE, L"MyEditClass", TEXT(""), WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL | ES_RIGHT | ES_READONLY, 0,0,0,0, hWnd, (HMENU)(INT_PTR)(IDC_EDSTART + i), GetModuleHandle(NULL), NULL);
+			}
 
-                ConvertLength = WideCharToMultiByte(CP_ACP, 0, wMyUtil, -1, NULL, 0, NULL, NULL);
-                WideCharToMultiByte(CP_ACP, 0, wMyUtil, -1, mMyUtil, ConvertLength, NULL, NULL);
-                pInit = (void (*)(HWND, HHOOK, HHOOK))GetProcAddress(g_hModule, mMyUtil);
-                if(pInit == NULL){ throw 6; }
-                (*pInit)(hWnd, g_hMouse, g_hKeyboard);
+			hControls[nControls - 1]= CreateWindowEx(WS_EX_CLIENTEDGE, L"listbox", NULL, WS_CHILD | WS_VISIBLE | WS_BORDER | WS_VSCROLL | LBS_NOTIFY | LBS_OWNERDRAWFIXED, 0,0,0,0, hWnd, (HMENU)(INT_PTR)IDC_LBSTART, GetModuleHandle(NULL), NULL);
 
-            } catch (const int err){
-                ErrorMessage(L"Init Failed");
-                if(err != 1){
-                    FreeLibrary(g_hModule);
-                }
-                return -1;
-            }
+			g_hScreenDC = GetDC(NULL);
+			g_hScreenMemDC = CreateCompatibleDC(g_hScreenDC);
+			hdc = GetDC(hWnd);
+			g_hMemDC = CreateCompatibleDC(hdc);
 
-            SetRect(&g_rcMagnify, 0,0, 100, 100);
+			hWhitePen = CreatePen(PS_SOLID, 1, RGB(255,255,255));
+			hBlackPen = CreatePen(PS_SOLID, 1, RGB(0,0,0));
+			ReleaseDC(hWnd, hdc);
 
-            color = ToCOLORREF(L"#c92519");
-            hRedBrush = CreateSolidBrush(color);
-            color = ToCOLORREF(L"#00A86B");
-            hGreenBrush = CreateSolidBrush(color);
-            color = ToCOLORREF(L"#0080ff");
-            hBlueBrush = CreateSolidBrush(color);
-            hBlackBrush = CreateSolidBrush(RGB(54, 69, 79));
+			bLine = FALSE;
 
-            GetClassInfo(NULL, L"edit", &wc);
-            wc.hInstance		= GetModuleHandle(NULL);
-            wc.lpszClassName	= L"MyEditClass";
-            OldEditProc			= wc.lpfnWndProc;
-            wc.lpfnWndProc		= (WNDPROC)EditProc;
-            RegisterClass(&wc);
-            SetProp(hWnd, L"MyEditClassProc", (HANDLE)OldEditProc);
-            for(int i=0; i<nEdit; i++){
-                hControls[i] = CreateWindowEx(WS_EX_CLIENTEDGE, L"MyEditClass", TEXT(""), WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL | ES_RIGHT | ES_READONLY, 0,0,0,0, hWnd, (HMENU)(INT_PTR)(IDC_EDSTART + i), GetModuleHandle(NULL), NULL);
-            }
+			hMenu                   = CreateMenu();
+			hPopupMenu              = CreatePopupMenu();
+			AppendMenu(hMenu, MF_STRING | MF_POPUP, (UINT_PTR)hPopupMenu, L"메뉴(&Menu)");
+			AppendMenu(hPopupMenu, MF_STRING, IDM_PROGRAM, L"프로그램 소개");
+			AppendMenu(hPopupMenu, MF_STRING | MF_UNCHECKED, IDM_LINE, L"보조선");
+			SetMenu(hWnd, hMenu);
 
-            hControls[nControls - 1]= CreateWindowEx(WS_EX_CLIENTEDGE, L"listbox", NULL, WS_CHILD | WS_VISIBLE | WS_BORDER | WS_VSCROLL | LBS_NOTIFY | LBS_OWNERDRAWFIXED, 0,0,0,0, hWnd, (HMENU)(INT_PTR)IDC_LBSTART, GetModuleHandle(NULL), NULL);
+			SetTimer(hWnd, 1, 10, NULL);
+			return 0;
 
-            g_hScreenDC = GetDC(NULL);
-            g_hScreenMemDC = CreateCompatibleDC(g_hScreenDC);
-            hdc = GetDC(hWnd);
-            g_hMemDC = CreateCompatibleDC(hdc);
+		case WM_SIZE:
+			if(wParam != SIZE_MINIMIZED){
+				GetClientRect(hWnd, &crt);
+				SetRect(&g_rcMagnify, 0,0, crt.right / 5, crt.bottom / 4);
 
-            hWhitePen = CreatePen(PS_SOLID, 1, RGB(255,255,255));
-            hBlackPen = CreatePen(PS_SOLID, 1, RGB(0,0,0));
-            ReleaseDC(hWnd, hdc);
-
-            bLine = FALSE;
-
-            hMenu                   = CreateMenu();
-            hPopupMenu              = CreatePopupMenu();
-            AppendMenu(hMenu, MF_STRING | MF_POPUP, (UINT_PTR)hPopupMenu, L"메뉴(&Menu)");
-            AppendMenu(hPopupMenu, MF_STRING, IDM_PROGRAM, L"프로그램 소개");
-            AppendMenu(hPopupMenu, MF_STRING | MF_UNCHECKED, IDM_LINE, L"보조선");
-            SetMenu(hWnd, hMenu);
-
-            SetTimer(hWnd, 1, 10, NULL);
-            return 0;
-
-        case WM_SIZE:
-            if(wParam != SIZE_MINIMIZED){
-                GetClientRect(hWnd, &crt);
-                SetRect(&g_rcMagnify, 0,0, crt.right / 5, crt.bottom / 4);
-
-                Width = 36;
+				Width = 36;
                 Height = 24;
-                x = Padding * 3  + g_rcMagnify.right * 2;
+				x = Padding * 3  + g_rcMagnify.right * 2;
 
-                y = Padding;
-                SetRect(&g_rcRGB, x, y, x + Width, y + Height);
-                y = Padding + (g_rcMagnify.bottom - Height) / 2;
-                SetRect(&g_rcHSV, x, y, x + Width, y + Height);
-                y = Padding + g_rcMagnify.bottom - Height;
-                SetRect(&g_rcHSL, x, y, x + Width, y + Height);
-                int Gap = (g_rcMagnify.bottom - (Height * 3)) / 2;
-                y = Padding + g_rcMagnify.bottom + Gap;
+				y = Padding;
+				SetRect(&g_rcRGB, x, y, x + Width, y + Height);
+				y = Padding + (g_rcMagnify.bottom - Height) / 2;
+				SetRect(&g_rcHSV, x, y, x + Width, y + Height);
+				y = Padding + g_rcMagnify.bottom - Height;
+				SetRect(&g_rcHSL, x, y, x + Width, y + Height);
+				int Gap = (g_rcMagnify.bottom - (Height * 3)) / 2;
+				y = Padding + g_rcMagnify.bottom + Gap;
                 SetRect(&g_rcHex, x, y, x + Width, y + Height);
 
-                x = g_rcRGB.right + (Padding / 2);
-                Width = (crt.right - x - (Padding / 2) * 3) / 3;
+				x = g_rcRGB.right + (Padding / 2);
+				Width = (crt.right - x - (Padding / 2) * 3) / 3;
 
-                iWidth = (LOWORD(lParam) - (Padding * 2 + g_rcMagnify.right)) / 2;
-                iHeight = (HIWORD(lParam) - (y + Height + Padding)) / 2;
-                g_iRadius = min(iWidth, iHeight) - Padding;
-                EllipseOrigin.x = LOWORD(lParam) - iWidth;
-                EllipseOrigin.y = HIWORD(lParam) - iHeight;
+				iWidth = (LOWORD(lParam) - (Padding * 2 + g_rcMagnify.right)) / 2;
+				iHeight = (HIWORD(lParam) - (y + Height + Padding)) / 2;
+				g_iRadius = min(iWidth, iHeight) - Padding;
+				EllipseOrigin.x = LOWORD(lParam) - iWidth;
+				EllipseOrigin.y = HIWORD(lParam) - iHeight;
 
                 SetRect(&srt, x, y, Width, Height);
                 for(int i=0; i<3; i++){
                     y = Padding;
                     SetWindowPos(hControls[i], NULL, x, y, Width, Height, SWP_NOZORDER);
 
-                    y = Padding + (g_rcMagnify.bottom - Height) / 2;
+					y = Padding + (g_rcMagnify.bottom - Height) / 2;
                     SetWindowPos(hControls[i + 3], NULL, x, y, Width, Height, SWP_NOZORDER);
 
-                    y = Padding + g_rcMagnify.bottom - Height;
+					y = Padding + g_rcMagnify.bottom - Height;
                     SetWindowPos(hControls[i + 6], NULL, x, y, Width, Height, SWP_NOZORDER);
 
                     y = Padding + g_rcMagnify.bottom + Gap;
@@ -379,96 +356,96 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
                     x += Width + (Padding / 2);
                 }
 
-                x = Padding;
-                y = Padding * 2 + g_rcMagnify.bottom;
-                Width = g_rcMagnify.right;
-                Height = HIWORD(lParam) - y - Padding;
-                SetWindowPos(hControls[nControls-1], NULL, x, y, Width, Height, SWP_NOZORDER);
+				x = Padding;
+				y = Padding * 2 + g_rcMagnify.bottom;
+				Width = g_rcMagnify.right;
+				Height = HIWORD(lParam) - y - Padding;
+				SetWindowPos(hControls[nControls-1], NULL, x, y, Width, Height, SWP_NOZORDER);
 
-                if(g_hMagnifyCaptureBitmap != NULL){
-                    DeleteObject(g_hMagnifyCaptureBitmap);
-                    g_hMagnifyCaptureBitmap = NULL;
-                }
+				if(g_hMagnifyCaptureBitmap != NULL){
+					DeleteObject(g_hMagnifyCaptureBitmap);
+					g_hMagnifyCaptureBitmap = NULL;
+				}
 
-                if(g_hScreenBitmap != NULL){
-                    DeleteObject(g_hScreenBitmap);
-                    g_hScreenBitmap = NULL;
-                }
+				if(g_hScreenBitmap != NULL){
+					DeleteObject(g_hScreenBitmap);
+					g_hScreenBitmap = NULL;
+				}
 
-                if(g_hDrawBitmap != NULL){
-                    DeleteObject(g_hDrawBitmap);
-                    g_hDrawBitmap = NULL;
-                }
+				if(g_hDrawBitmap != NULL){
+					DeleteObject(g_hDrawBitmap);
+					g_hDrawBitmap = NULL;
+				}
 
-                if(g_hBitmap != NULL){
-                    DeleteObject(g_hBitmap);
-                    g_hBitmap = NULL;
-                }
+				if(g_hBitmap != NULL){
+					DeleteObject(g_hBitmap);
+					g_hBitmap = NULL;
+				}
 
-            }
-            return 0;
+			}
+			return 0;
 
-        case WM_SETFOCUS:
+		case WM_SETFOCUS:
             // 복사 가능하다는 것을 표시
-            SetFocus(hControls[0]);
-            return 0;
+			SetFocus(hControls[0]);
+			return 0;
 
-        case WM_GETMINMAXINFO:
-            {
-                LPMINMAXINFO lpmmi = (LPMINMAXINFO)lParam;
+		case WM_GETMINMAXINFO:
+			{
+				LPMINMAXINFO lpmmi = (LPMINMAXINFO)lParam;
 
-                SetRect(&crt, 0,0, 550, 420);
-                dwStyle = GetWindowLongPtr(hWnd, GWL_STYLE);
-                dwExStyle = GetWindowLongPtr(hWnd, GWL_EXSTYLE);
-                AdjustWindowRectEx(&crt, dwStyle, GetMenu(hWnd) != NULL, dwExStyle);
-                lpmmi->ptMinTrackSize.x = crt.right;
-                lpmmi->ptMinTrackSize.y = crt.bottom;
-            }
-            return 0;
+				SetRect(&crt, 0,0, 550, 420);
+				dwStyle = GetWindowLongPtr(hWnd, GWL_STYLE);
+				dwExStyle = GetWindowLongPtr(hWnd, GWL_EXSTYLE);
+				AdjustWindowRectEx(&crt, dwStyle, GetMenu(hWnd) != NULL, dwExStyle);
+				lpmmi->ptMinTrackSize.x = crt.right;
+				lpmmi->ptMinTrackSize.y = crt.bottom;
+			}
+			return 0;
 
-        case WM_MEASUREITEM:
-            {
-                LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)lParam;
-                lpmis->itemHeight = 16;
-            }
-            return TRUE;
+		case WM_MEASUREITEM:
+			{
+				LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)lParam;
+				lpmis->itemHeight = 16;
+			}
+			return TRUE;
 
-        case WM_DRAWITEM:
-            {
-                HBRUSH hBrush, hColorBrush, hColorOldBrush;
+		case WM_DRAWITEM:
+			{
+				HBRUSH hBrush, hColorBrush, hColorOldBrush;
 
-                LPDRAWITEMSTRUCT lpdis = (LPDRAWITEMSTRUCT)lParam;
-                if(lpdis->itemState & ODS_SELECTED){
-                    hBrush = GetSysColorBrush(COLOR_HIGHLIGHT);
-                }else{
-                    hBrush = GetSysColorBrush(COLOR_BTNFACE);
-                }
+				LPDRAWITEMSTRUCT lpdis = (LPDRAWITEMSTRUCT)lParam;
+				if(lpdis->itemState & ODS_SELECTED){
+					hBrush = GetSysColorBrush(COLOR_HIGHLIGHT);
+				}else{
+					hBrush = GetSysColorBrush(COLOR_BTNFACE);
+				}
 
-                FillRect(lpdis->hDC, &lpdis->rcItem, hBrush);
+				FillRect(lpdis->hDC, &lpdis->rcItem, hBrush);
 
-                color = (COLORREF)lpdis->itemData;
-                hColorBrush = CreateSolidBrush(color);
-                hColorOldBrush = (HBRUSH)SelectObject(lpdis->hDC, hColorBrush);
+				color = (COLORREF)lpdis->itemData;
+				hColorBrush = CreateSolidBrush(color);
+				hColorOldBrush = (HBRUSH)SelectObject(lpdis->hDC, hColorBrush);
 
-                Rectangle(lpdis->hDC, lpdis->rcItem.left + 5, lpdis->rcItem.top + 2, lpdis->rcItem.right - 5, lpdis->rcItem.bottom - 2);
-                SelectObject(lpdis->hDC, hColorOldBrush);
-                DeleteObject(hColorBrush);
-            }
-            return TRUE;
+				Rectangle(lpdis->hDC, lpdis->rcItem.left + 5, lpdis->rcItem.top + 2, lpdis->rcItem.right - 5, lpdis->rcItem.bottom - 2);
+				SelectObject(lpdis->hDC, hColorOldBrush);
+				DeleteObject(hColorBrush);
+			}
+			return TRUE;
 
-        case WM_COMMAND:
-            switch(LOWORD(wParam)){
-                case IDC_LBSTART:
-                    switch(HIWORD(wParam)){
-                        case LBN_SELCHANGE:
-                            {
-                                int idx	= SendMessage(hControls[nControls - 1], LB_GETCURSEL, 0,0);
-                                if(idx == LB_ERR){ return 0; }
-                                EllipseColor = (COLORREF)SendMessage(hControls[nControls - 1], LB_GETITEMDATA, idx, 0);
+		case WM_COMMAND:
+			switch(LOWORD(wParam)){
+				case IDC_LBSTART:
+					switch(HIWORD(wParam)){
+						case LBN_SELCHANGE:
+							{
+								int idx	= SendMessage(hControls[nControls - 1], LB_GETCURSEL, 0,0);
+								if(idx == LB_ERR){ return 0; }
+								EllipseColor = (COLORREF)SendMessage(hControls[nControls - 1], LB_GETITEMDATA, idx, 0);
 
-                                int r = GetRValue(EllipseColor),
-                                    g = GetGValue(EllipseColor),
-                                    b = GetBValue(EllipseColor);
+								int r = GetRValue(EllipseColor),
+									g = GetGValue(EllipseColor),
+									b = GetBValue(EllipseColor);
 
                                 #if (OBSOLETE)
                                 {
@@ -496,7 +473,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
                                     SetDlgItemText(hWnd, IDC_EDSTART+9, Percentage);
                                 }
                                 #endif
-
+								
                                 SetDlgItemInt(hWnd, (INT_PTR)(IDC_EDSTART + 0), r, FALSE);
                                 SetDlgItemInt(hWnd, (INT_PTR)(IDC_EDSTART + 1), g, FALSE);
                                 SetDlgItemInt(hWnd, (INT_PTR)(IDC_EDSTART + 2), b, FALSE);
@@ -530,474 +507,345 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
                                 ToHexCode(b, HexCode, sizeof(HexCode));
                                 SetDlgItemText(hWnd, (INT_PTR)(IDC_EDSTART + 11), HexCode); 
 
-                                InvalidateRect(hWnd, NULL, FALSE);
-                            }
-                            break;
-                    }
-                    break;
+								InvalidateRect(hWnd, NULL, FALSE);
+							}
+							break;
+					}
+					break;
 
-                case IDM_PROGRAM:
-                    MessageBox(hWnd, L"프로그램 소개\r\n\r\n이 프로그램은 색상값 조사에 사용되는 컬러 픽커입니다.\r\n\r\n마우스 커서를 기준으로 일정한 크기의 영역을 캡처하여\r\n이미지 정보를 가져온 후 값을 추출할 색상 위에\r\n마우스 커서를 위치시켜 단축키로 색상을 추출할 수 있습니다.\r\n색상 추출은 픽셀 단위로만 가능합니다.\r\n\r\n단축키\r\n• Ctrl + Alt + 3 : 마우스 주변 영역을 캡처합니다. \r\n• Ctrl + Alt + 4 : 마우스 커서가 위치한 지점의 색상값을 추출합니다.\r\n• Alt + Wheel Up(Down) : 이미지를 확대하거나 축소할 수 있습니다.\r\n\r\nHSV / HSL\r\n위 프로그램에서 HSV / HSL은 [0,1]로 정규화된 범위를 갖습니다.\r\n\r\n• 색상(H) : 360°를 곱하여 색상각을 구할 수 있습니다.\r\n• 채도(S) : 100을 곱하여 백분율 값을 구할 수 있습니다.\r\n• 명도(V/L) : 100을 곱하여 백분율 값을 구할 수 있습니다.\r\n\r\n※ 참고\r\n색상값을 변환할 때 최근 변환한 색상을 리스트에 기록합니다.\r\n리스트에 기록된 색상을 선택하면 타원형 이미지에 색상을 적용하여 보여줍니다.", L"ColorFromPoint", MB_OK);
-                    break;
+				case IDM_PROGRAM:
+					MessageBox(hWnd, L"프로그램 소개\r\n\r\n이 프로그램은 색상값 조사에 사용되는 컬러 픽커입니다.\r\n\r\n마우스 커서를 기준으로 일정한 크기의 영역을 캡처하여\r\n이미지 정보를 가져온 후 값을 추출할 색상 위에\r\n마우스 커서를 위치시켜 단축키로 색상을 추출할 수 있습니다.\r\n색상 추출은 픽셀 단위로만 가능합니다.\r\n\r\n단축키\r\n• Ctrl + Alt + 3 : 마우스 주변 영역을 캡처합니다. \r\n• Ctrl + Alt + 4 : 마우스 커서가 위치한 지점의 색상값을 추출합니다.\r\n• Alt + Wheel Up(Down) : 이미지를 확대하거나 축소할 수 있습니다.\r\n\r\nHSV / HSL\r\n위 프로그램에서 HSV / HSL은 [0,1]로 정규화된 범위를 갖습니다.\r\n\r\n• 색상(H) : 360°를 곱하여 색상각을 구할 수 있습니다.\r\n• 채도(S) : 100을 곱하여 백분율 값을 구할 수 있습니다.\r\n• 명도(V/L) : 100을 곱하여 백분율 값을 구할 수 있습니다.\r\n\r\n※ 참고\r\n색상값을 변환할 때 최근 변환한 색상을 리스트에 기록합니다.\r\n리스트에 기록된 색상을 선택하면 타원형 이미지에 색상을 적용하여 보여줍니다.", L"ColorFromPoint", MB_OK);
+					break;
 
-                case IDM_LINE:
-                    bLine = !bLine;
-                    break;
-            }
-            return 0;
+				case IDM_LINE:
+					bLine = !bLine;
+					break;
+			}
+			return 0;
 
-        case WM_INITMENU:
-            if(bLine){
-                CheckMenuItem(GetSubMenu((HMENU)wParam, 0), IDM_LINE, MF_BYCOMMAND | MF_CHECKED);
-            }else{
-                CheckMenuItem(GetSubMenu((HMENU)wParam, 0), IDM_LINE, MF_BYCOMMAND | MF_UNCHECKED);
-            }
-            return 0;
+		case WM_INITMENU:
+			if(bLine){
+				CheckMenuItem(GetSubMenu((HMENU)wParam, 0), IDM_LINE, MF_BYCOMMAND | MF_CHECKED);
+			}else{
+				CheckMenuItem(GetSubMenu((HMENU)wParam, 0), IDM_LINE, MF_BYCOMMAND | MF_UNCHECKED);
+			}
+			return 0;
 
-        case WM_TIMER:
-            switch(wParam){
-                case 1:
-                    {
-                        GetClientRect(hWnd, &crt);
-                        hdc = GetDC(hWnd);
-                        if(g_hMemDC == NULL){
-                            g_hMemDC = CreateCompatibleDC(hdc);
-                        }
+		case WM_TIMER:
+			switch(wParam){
+				case 1:
+					{
+						GetClientRect(hWnd, &crt);
+						hdc = GetDC(hWnd);
+						if(g_hMemDC == NULL){
+							g_hMemDC = CreateCompatibleDC(hdc);
+						}
 
-                        if(g_hBitmap == NULL){
-                            g_hBitmap = CreateCompatibleBitmap(hdc, crt.right, crt.bottom);
-                        }
+						if(g_hBitmap == NULL){
+							g_hBitmap = CreateCompatibleBitmap(hdc, crt.right, crt.bottom);
+						}
 
-                        HGDIOBJ hOld = SelectObject(g_hMemDC, g_hBitmap);
-                        FillRect(g_hMemDC, &crt, GetSysColorBrush(COLOR_BTNFACE));
+						HGDIOBJ hOld = SelectObject(g_hMemDC, g_hBitmap);
+						FillRect(g_hMemDC, &crt, GetSysColorBrush(COLOR_BTNFACE));
 
-                        if(g_hScreenDC == NULL){
-                            g_hScreenDC = GetDC(NULL);
-                        }
+						if(g_hScreenDC == NULL){
+							g_hScreenDC = GetDC(NULL);
+						}
 
-                        if(g_hScreenMemDC == NULL){
-                            g_hScreenMemDC = CreateCompatibleDC(g_hScreenDC);
-                        }
+						if(g_hScreenMemDC == NULL){
+							g_hScreenMemDC = CreateCompatibleDC(g_hScreenDC);
+						}
 
-                        if(g_hScreenBitmap == NULL){
-                            g_hScreenBitmap = CreateCompatibleBitmap(g_hScreenDC, g_rcMagnify.right, g_rcMagnify.bottom);
-                        }
+						if(g_hScreenBitmap == NULL){
+							g_hScreenBitmap = CreateCompatibleBitmap(g_hScreenDC, g_rcMagnify.right, g_rcMagnify.bottom);
+						}
 
-                        HGDIOBJ hScreenOld = SelectObject(g_hScreenMemDC, g_hScreenBitmap);
-                        GetObject(g_hScreenBitmap, sizeof(BITMAP), &bmp);
-                        BitBlt(
-                                g_hScreenMemDC,
-                                0, 0, bmp.bmWidth * g_XScale, bmp.bmHeight * g_YScale,
-                                g_hScreenDC,
-                                g_X - (bmp.bmWidth / g_Rate / 2), g_Y - (bmp.bmHeight / g_Rate / 2),
-                                SRCCOPY
-                              );
+						HGDIOBJ hScreenOld = SelectObject(g_hScreenMemDC, g_hScreenBitmap);
+						GetObject(g_hScreenBitmap, sizeof(BITMAP), &bmp);
+						BitBlt(
+								g_hScreenMemDC,
+								0, 0, bmp.bmWidth * g_XScale, bmp.bmHeight * g_YScale,
+								g_hScreenDC,
+								g_X - (bmp.bmWidth / g_Rate / 2), g_Y - (bmp.bmHeight / g_Rate / 2),
+								SRCCOPY
+							  );
 
-                        if(g_hDrawMemDC == NULL){
-                            g_hDrawMemDC = CreateCompatibleDC(hdc);
-                        }
+						if(g_hDrawMemDC == NULL){
+							g_hDrawMemDC = CreateCompatibleDC(hdc);
+						}
 
-                        if(g_hDrawBitmap == NULL){
-                            g_hDrawBitmap = CreateCompatibleBitmap(hdc, g_rcMagnify.right, g_rcMagnify.bottom);
-                        }
+						if(g_hDrawBitmap == NULL){
+							g_hDrawBitmap = CreateCompatibleBitmap(hdc, g_rcMagnify.right, g_rcMagnify.bottom);
+						}
 
-                        HGDIOBJ hDrawOld = SelectObject(g_hDrawMemDC, g_hDrawBitmap);
-                        GetObject(g_hDrawBitmap, sizeof(BITMAP), &bmp);
-                        SetStretchBltMode(g_hDrawMemDC, HALFTONE);
-                        StretchBlt(
-                                g_hDrawMemDC,
-                                0, 0, bmp.bmWidth * g_XScale, bmp.bmHeight * g_YScale,
-                                g_hScreenMemDC,
-                                0, 0, (bmp.bmWidth / g_Rate) * g_XScale, (bmp.bmHeight / g_Rate) * g_YScale,
-                                SRCCOPY
-                                );
+						HGDIOBJ hDrawOld = SelectObject(g_hDrawMemDC, g_hDrawBitmap);
+						GetObject(g_hDrawBitmap, sizeof(BITMAP), &bmp);
+						SetStretchBltMode(g_hDrawMemDC, HALFTONE);
+						StretchBlt(
+								g_hDrawMemDC,
+								0, 0, bmp.bmWidth * g_XScale, bmp.bmHeight * g_YScale,
+								g_hScreenMemDC,
+								0, 0, (bmp.bmWidth / g_Rate) * g_XScale, (bmp.bmHeight / g_Rate) * g_YScale,
+								SRCCOPY
+								);
 
-                        iWidth	= bmp.bmWidth;
-                        iHeight	= bmp.bmHeight;
+						iWidth	= bmp.bmWidth;
+						iHeight	= bmp.bmHeight;
+						iRadius	= 2;
 
-                        iRadius	= 2;
-                        Origin.x = iWidth / 2;
-                        Origin.y = iHeight / 2;
+						Origin.x = iWidth / 2;
+						Origin.y = iHeight / 2;
 
-                        color = GetAverageColor(g_hDrawMemDC, Origin.x, Origin.y, iRadius);
+						color = GetAverageColor(g_hDrawMemDC, Origin.x, Origin.y, iRadius);
 
-                        HPEN hOldPen;
-                        if(IsColorDark(color)){
-                            hOldPen	= (HPEN)SelectObject(g_hDrawMemDC, hWhitePen);
-                        }else{
-                            hOldPen	= (HPEN)SelectObject(g_hDrawMemDC, hBlackPen);
-                        }
+						HPEN hOldPen;
+						if(IsColorDark(color)){
+							hOldPen	= (HPEN)SelectObject(g_hDrawMemDC, hWhitePen);
+						}else{
+							hOldPen	= (HPEN)SelectObject(g_hDrawMemDC, hBlackPen);
+						}
 
-                        SelectColor = GetPixel(g_hDrawMemDC, Origin.x, Origin.y);
+						SelectColor = GetPixel(g_hDrawMemDC, Origin.x, Origin.y);
 
-                        if(bLine){
-                            MoveToEx(g_hDrawMemDC, 0, Origin.y, NULL);
-                            LineTo(g_hDrawMemDC, iWidth, Origin.y);
-                            MoveToEx(g_hDrawMemDC, Origin.x, 0, NULL);
-                            LineTo(g_hDrawMemDC, Origin.x, iHeight);
-                        }
+						if(bLine){
+							MoveToEx(g_hDrawMemDC, 0, Origin.y, NULL);
+							LineTo(g_hDrawMemDC, iWidth, Origin.y);
+							MoveToEx(g_hDrawMemDC, Origin.x, 0, NULL);
+							LineTo(g_hDrawMemDC, Origin.x, iHeight);
+						}
 
-                        HBRUSH hOldBrush = (HBRUSH)SelectObject(g_hDrawMemDC, (HBRUSH)GetStockObject(NULL_BRUSH));
-                        Ellipse(g_hDrawMemDC, Origin.x - iRadius, Origin.y - iRadius, Origin.x + iRadius, Origin.y + iRadius);
-                        SelectObject(g_hDrawMemDC, hOldBrush);
-                        SelectObject(g_hDrawMemDC, hOldPen);
+						HBRUSH hOldBrush = (HBRUSH)SelectObject(g_hDrawMemDC, (HBRUSH)GetStockObject(NULL_BRUSH));
+						Ellipse(g_hDrawMemDC, Origin.x - iRadius, Origin.y - iRadius, Origin.x + iRadius, Origin.y + iRadius);
+						SelectObject(g_hDrawMemDC, hOldBrush);
+						SelectObject(g_hDrawMemDC, hOldPen);
 
-                        SelectObject(g_hDrawMemDC, hDrawOld);
-                        SelectObject(g_hScreenMemDC, hScreenOld);
+						SelectObject(g_hDrawMemDC, hDrawOld);
+						SelectObject(g_hScreenMemDC, hScreenOld);
 
-                        SetRect(&srt, Padding, Padding, Padding + g_rcMagnify.right, Padding + g_rcMagnify.bottom);
-                        InflateRect(&srt, EDGEFRAME, EDGEFRAME);
-                        DrawEdge(g_hMemDC, &srt, EDGE_SUNKEN, BF_RECT);
+						SetRect(&srt, Padding, Padding, Padding + g_rcMagnify.right, Padding + g_rcMagnify.bottom);
+						InflateRect(&srt, EDGEFRAME, EDGEFRAME);
+						DrawEdge(g_hMemDC, &srt, EDGE_SUNKEN, BF_RECT);
 
-                        InflateRect(&srt, -EDGEFRAME, -EDGEFRAME);
-                        if(g_hDrawBitmap != NULL){
-                            DrawBitmap(g_hMemDC, srt.left, srt.top, g_hDrawBitmap);
-                        }
+						InflateRect(&srt, -EDGEFRAME, -EDGEFRAME);
+						if(g_hDrawBitmap != NULL){
+							DrawBitmap(g_hMemDC, srt.left, srt.top, g_hDrawBitmap);
+						}
 
-                        SetRect(&srt, Padding + srt.right, srt.top, Padding + srt.right + g_rcMagnify.right, srt.bottom);
-                        InflateRect(&srt, EDGEFRAME, EDGEFRAME);
-                        DrawEdge(g_hMemDC, &srt, EDGE_SUNKEN, BF_RECT);
+						SetRect(&srt, Padding + srt.right, srt.top, Padding + srt.right + g_rcMagnify.right, srt.bottom);
+						InflateRect(&srt, EDGEFRAME, EDGEFRAME);
+						DrawEdge(g_hMemDC, &srt, EDGE_SUNKEN, BF_RECT);
 
-                        InflateRect(&srt, -EDGEFRAME, -EDGEFRAME);
-                        if(g_hMagnifyCaptureBitmap != NULL){
-                            DrawBitmap(g_hMemDC, srt.left, srt.top, g_hMagnifyCaptureBitmap);
-                        }
+						InflateRect(&srt, -EDGEFRAME, -EDGEFRAME);
+						if(g_hMagnifyCaptureBitmap != NULL){
+							DrawBitmap(g_hMemDC, srt.left, srt.top, g_hMagnifyCaptureBitmap);
+						}
 
-                        DrawEdge(g_hMemDC, &g_rcRGB, EDGE_SUNKEN, BF_RECT);
-                        DrawEdge(g_hMemDC, &g_rcHSV, EDGE_SUNKEN, BF_RECT);
-                        DrawEdge(g_hMemDC, &g_rcHSL, EDGE_SUNKEN, BF_RECT);
-                        DrawEdge(g_hMemDC, &g_rcHex, EDGE_SUNKEN, BF_RECT);
+						DrawEdge(g_hMemDC, &g_rcRGB, EDGE_SUNKEN, BF_RECT);
+						DrawEdge(g_hMemDC, &g_rcHSV, EDGE_SUNKEN, BF_RECT);
+						DrawEdge(g_hMemDC, &g_rcHSL, EDGE_SUNKEN, BF_RECT);
+						DrawEdge(g_hMemDC, &g_rcHex, EDGE_SUNKEN, BF_RECT);
 
                         int BkMode = SetBkMode(g_hMemDC, TRANSPARENT);
-                        CopyRect(&srt, &g_rcRGB);
-                        InflateRect(&srt, -EDGEFRAME, -EDGEFRAME);
+						CopyRect(&srt, &g_rcRGB);
+						InflateRect(&srt, -EDGEFRAME, -EDGEFRAME);
                         DrawText(g_hMemDC, L"RGB", -1, &g_rcRGB, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
-                        CopyRect(&srt, &g_rcHSV);
-                        InflateRect(&srt, -EDGEFRAME, -EDGEFRAME);
+						CopyRect(&srt, &g_rcHSV);
+						InflateRect(&srt, -EDGEFRAME, -EDGEFRAME);
                         DrawText(g_hMemDC, L"HSV", -1, &g_rcHSV, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
-                        CopyRect(&srt, &g_rcHSL);
-                        InflateRect(&srt, -EDGEFRAME, -EDGEFRAME);
+						CopyRect(&srt, &g_rcHSL);
+						InflateRect(&srt, -EDGEFRAME, -EDGEFRAME);
                         DrawText(g_hMemDC, L"HSL", -1, &g_rcHSL, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
-                        CopyRect(&srt, &g_rcHex);
-                        InflateRect(&srt, -EDGEFRAME, -EDGEFRAME);
+						CopyRect(&srt, &g_rcHex);
+						InflateRect(&srt, -EDGEFRAME, -EDGEFRAME);
                         DrawText(g_hMemDC, L"HEX", -1, &g_rcHex, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
                         SetBkMode(g_hMemDC, BkMode);
-                        HBRUSH hEllipseBrush = CreateSolidBrush(EllipseColor),
-                               hEllipseOldBrush	= (HBRUSH)SelectObject(g_hMemDC, hEllipseBrush);
-                        Ellipse(g_hMemDC, EllipseOrigin.x - g_iRadius, EllipseOrigin.y - g_iRadius, EllipseOrigin.x + g_iRadius, EllipseOrigin.y + g_iRadius);
-                        SelectObject(g_hMemDC, hEllipseOldBrush);
-                        DeleteObject(hEllipseBrush);
+						HBRUSH hEllipseBrush = CreateSolidBrush(EllipseColor),
+							   hEllipseOldBrush	= (HBRUSH)SelectObject(g_hMemDC, hEllipseBrush);
+						Ellipse(g_hMemDC, EllipseOrigin.x - g_iRadius, EllipseOrigin.y - g_iRadius, EllipseOrigin.x + g_iRadius, EllipseOrigin.y + g_iRadius);
+						SelectObject(g_hMemDC, hEllipseOldBrush);
+						DeleteObject(hEllipseBrush);
 
-                        GetObject(g_hBitmap, sizeof(BITMAP), &bmp);
-                        BitBlt(hdc, 0,0, bmp.bmWidth, bmp.bmHeight, g_hMemDC, 0,0, SRCCOPY);
-                        SelectObject(g_hMemDC, hOld);
-                        ReleaseDC(hWnd, hdc);
-                    }
-                    break;
-            }
-            return 0;
-        case WM_PAINT:
-            {
-                PAINTSTRUCT ps;
-                hdc = BeginPaint(hWnd, &ps);
-                EndPaint(hWnd, &ps);
-            }
-            return 0;
+						GetObject(g_hBitmap, sizeof(BITMAP), &bmp);
+						BitBlt(hdc, 0,0, bmp.bmWidth, bmp.bmHeight, g_hMemDC, 0,0, SRCCOPY);
+						SelectObject(g_hMemDC, hOld);
+						ReleaseDC(hWnd, hdc);
+					}
+					break;
+			}
+			return 0;
+		case WM_PAINT:
+			{
+				PAINTSTRUCT ps;
+				hdc = BeginPaint(hWnd, &ps);
+				EndPaint(hWnd, &ps);
+			}
+			return 0;
 
-        case WM_KEYBOARDHOOK:
-            {
-                KBDLLHOOKSTRUCT *ptr = (KBDLLHOOKSTRUCT*)lParam;
+		case WM_KEYBOARDHOOK:
+			{
+				KBDLLHOOKSTRUCT *ptr = (KBDLLHOOKSTRUCT*)lParam;
 
-                switch(wParam){
-                    case WM_KEYUP:
-                    case WM_KEYDOWN:
-                        {
-                            WORD VKCode = ptr->vkCode,
-                                 KeyFlags = ptr->flags,
-                                 ScanCode = ptr->scanCode;
+				switch(wParam){
+					case WM_KEYUP:
+					case WM_KEYDOWN:
+						{
+							WORD VKCode = ptr->vkCode,
+								 KeyFlags = ptr->flags,
+								 ScanCode = ptr->scanCode;
 
-                            BOOL bExtended,
-                                 bWasKeyDown,
-                                 bKeyReleased;
+							BOOL bExtended,
+								 bWasKeyDown,
+								 bKeyReleased;
 
-                            // 확장 키(Numpad 등) 플래그 있을 시 0xE0이 접두(HIWORD)로 붙는다
-                            bExtended	= ((KeyFlags&& LLKHF_EXTENDED) == LLKHF_EXTENDED);
-                            if(bExtended){ ScanCode = MAKEWORD(ScanCode, 0xE0); }
-                            bWasKeyDown	= !(KeyFlags & LLKHF_UP);
+							// 확장 키(Numpad 등) 플래그 있을 시 0xE0이 접두(HIWORD)로 붙는다
+							bExtended	= ((KeyFlags&& LLKHF_EXTENDED) == LLKHF_EXTENDED);
+							if(bExtended){ ScanCode = MAKEWORD(ScanCode, 0xE0); }
+							bWasKeyDown	= !(KeyFlags & LLKHF_UP);
 
-                            if(bWasKeyDown){
-                                switch(VKCode){
-                                    case 0x33:
-                                        if(GetKeyState(VK_CONTROL) & 0x8000 && GetKeyState(VK_MENU) & 0x8000){
-                                            if(g_hMagnifyCaptureBitmap != NULL){
-                                                DeleteObject(g_hMagnifyCaptureBitmap);
-                                                g_hMagnifyCaptureBitmap = NULL;
-                                            }
+							if(bWasKeyDown){
+								switch(VKCode){
+									case 0x33:
+										if(GetKeyState(VK_CONTROL) & 0x8000 && GetKeyState(VK_MENU) & 0x8000){
+											if(g_hMagnifyCaptureBitmap != NULL){
+												DeleteObject(g_hMagnifyCaptureBitmap);
+												g_hMagnifyCaptureBitmap = NULL;
+											}
 
-                                            hdc = GetDC(hWnd);
-                                            if(g_hCaptureMemDC == NULL){
-                                                g_hCaptureMemDC = CreateCompatibleDC(hdc);
-                                            }
+											hdc = GetDC(hWnd);
+											if(g_hCaptureMemDC == NULL){
+												g_hCaptureMemDC = CreateCompatibleDC(hdc);
+											}
 
-                                            GetObject(g_hScreenBitmap, sizeof(BITMAP), &bmp);
-                                            g_hMagnifyCaptureBitmap = CreateCompatibleBitmap(hdc, bmp.bmWidth, bmp.bmHeight);
-                                            HGDIOBJ hOld = SelectObject(g_hMemDC, g_hScreenBitmap);
-                                            HGDIOBJ hTempOld = SelectObject(g_hCaptureMemDC, g_hMagnifyCaptureBitmap);
+											GetObject(g_hScreenBitmap, sizeof(BITMAP), &bmp);
+											g_hMagnifyCaptureBitmap = CreateCompatibleBitmap(hdc, bmp.bmWidth, bmp.bmHeight);
+											HGDIOBJ hOld = SelectObject(g_hMemDC, g_hScreenBitmap);
+											HGDIOBJ hTempOld = SelectObject(g_hCaptureMemDC, g_hMagnifyCaptureBitmap);
 
-                                            #if(OBSOLETE)
-                                            { // ICC 프로파일 적용 시도
-                                                try{
-                                                    Length = WideCharToMultiByte(CP_ACP, 0, ICMPath, -1, NULL, 0, NULL, NULL);
-                                                    ConvertICMPath = (CHAR*)malloc(Length + 1);
-                                                    WideCharToMultiByte(CP_ACP, 0, ICMPath, -1, ConvertICMPath, Length, NULL, NULL);
+											SetStretchBltMode(g_hCaptureMemDC, HALFTONE);
+											StretchBlt(
+													g_hCaptureMemDC,
+													0, 0, bmp.bmWidth * g_XScale, bmp.bmHeight * g_YScale,
+													g_hMemDC,
+													0, 0, (bmp.bmWidth / g_Rate) * g_XScale, (bmp.bmHeight / g_Rate) * g_YScale,
+													SRCCOPY
+													);
 
-                                                    if(Transform){ cmsDeleteTransform(Transform); }
-                                                    if(Monitor){ cmsCloseProfile(Monitor); }
-                                                    if(sRGB){ cmsCloseProfile(sRGB); }
-                                                    sRGB = cmsCreate_sRGBProfile();
-                                                    Monitor = cmsOpenProfileFromFile(ConvertICMPath, "r");
-                                                    Transform = cmsCreateTransform(
-                                                            sRGB,
-                                                            TYPE_BGRA_8,
-                                                            Monitor,
-                                                            TYPE_BGRA_8,
-                                                            INTENT_RELATIVE_COLORIMETRIC,
-                                                            cmsFLAGS_BLACKPOINTCOMPENSATION
-                                                            );
+											SelectObject(g_hCaptureMemDC, hTempOld);
+											SelectObject(g_hMemDC, hOld);
+											ReleaseDC(hWnd, hdc);
+										}
+										break;
 
-                                                    iWidth = bmp.bmWidth;
-                                                    iHeight = bmp.bmHeight;
-                                                    PixelCount = iWidth * iHeight;
+									case 0x34:
+										if(GetKeyState(VK_CONTROL) & 0x8000 && GetKeyState(VK_MENU) & 0x8000){
+											if(g_hDrawBitmap){
+												SendMessage(hControls[nControls-1], LB_INSERTSTRING, 0, (LPARAM)SelectColor);
+											}
+										}
+										break;
 
-                                                    /*  // 1번: 직접 계산
-                                                    HBITMAP hTempBitmap = Convert(g_hMemDC, g_hScreenBitmap, iWidth, iHeight);
-                                                    DeleteObject(g_hScreenBitmap);
-                                                    g_hScreenBitmap = hTempBitmap;
+									default:
+										break;
+								}
+							}
+						}
+						break;
+				}
+			}
+			InvalidateRect(hWnd, NULL, FALSE);
+			return 0;
 
-                                                    // 24bpp, 3바이트
-                                                    // BytesPerPixel = 3;
-                                                    // Stride = ((iWidth * BytesPerPixel) + 3) & ~3;
+		case WM_MOUSEHOOK:
+			{
+				MSLLHOOKSTRUCT*ptr = (MSLLHOOKSTRUCT*)lParam;
+				Mouse.x = g_X = (int)(ptr->pt.x);
+				Mouse.y = g_Y = (int)(ptr->pt.y);
 
-                                                    // 32bpp, 4바이트
-                                                    BytesPerPixel = 4;
-                                                    Stride = iWidth * BytesPerPixel;
-                                                    BufferSize = Stride * iHeight;
+				SHORT WheelDelta,
+					  XButton;
 
-                                                    if(PrevBuffer){ delete[] PrevBuffer; }
-                                                    if(Buffer){ delete[] Buffer; }
-                                                    PrevBuffer = new BYTE[BufferSize];
-                                                    Buffer = new BYTE[BufferSize];
-                                                    */
+				int	Lines		= 0,
+					nScroll		= 0,
+					WheelUnit	= 0;
+				static int	SumDelta	= 0;
 
-                                                    /* // 2번: GetDIBits 이용 - 24bpp만
-                                                    BITMAPINFOHEADER *bih;
-                                                    memset(&bmi, 0, sizeof(bmi));
+				switch(wParam){
+					case WM_MOUSEMOVE:
+						hCurrentMonitor = MonitorFromPoint(Mouse, MONITOR_DEFAULTTONEAREST);
 
-                                                    bih = &bmi.bmiHeader;
-                                                    bih->biSize = sizeof(BITMAPINFOHEADER);
-                                                    bih->biBitCount = 32;
-                                                    bih->biPlanes = 1;
-                                                    bih->biCompression = BI_RGB;
-                                                    bih->biWidth = iWidth;
-                                                    bih->biHeight = -iHeight;
+						if(g_hCurrentMonitor != hCurrentMonitor){
+							g_hCurrentMonitor = hCurrentMonitor;
+							GetRealDpi(g_hCurrentMonitor, &g_XScale, &g_YScale);
+						}
+						break;
 
-                                                    GetDIBits(g_hMemDC, g_hScreenBitmap, 0, -iHeight, NULL, &bmi, DIB_RGB_COLORS);
-                                                    BufferSize = bmi.bmiHeader.biSizeImage;
+					case WM_MOUSEWHEEL:
+						if(GetKeyState(VK_MENU) & 0x8000){
+							if(g_hScreenBitmap != NULL){
+								DeleteObject(g_hScreenBitmap);
+								g_hScreenBitmap = NULL;
+							}
 
-                                                    if(PrevBuffer){ delete[] PrevBuffer; }
-                                                    if(Buffer){ delete[] Buffer; }
-                                                    PrevBuffer = new BYTE[BufferSize];
-                                                    Buffer = new BYTE[BufferSize];
-                                                    */
+							if(g_hDrawBitmap != NULL){
+								DeleteObject(g_hDrawBitmap);
+								g_hDrawBitmap = NULL;
+							}
 
-                                                    memset(&bmi, 0, sizeof(bmi));
-                                                    bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-                                                    bmi.bmiHeader.biWidth = iWidth;
-                                                    bmi.bmiHeader.biHeight = iHeight;
-                                                    bmi.bmiHeader.biPlanes = 1;
-                                                    bmi.bmiHeader.biBitCount = 24;
-                                                    bmi.bmiHeader.biCompression = BI_RGB;
+							if(g_hBitmap != NULL){
+								DeleteObject(g_hBitmap);
+								g_hBitmap = NULL;
+							}
 
-                                                    GetDIBits(g_hMemDC, g_hScreenBitmap, 0, iHeight, NULL, &bmi, DIB_RGB_COLORS);
-                                                    DWORD dwSize = bmi.bmiHeader.biSizeImage;
+							nScroll			= 0;
+							WheelDelta		= HIWORD(ptr->mouseData);
 
-                                                    Buffer = new BYTE[dwSize];
-                                                    GetDIBits(g_hMemDC, g_hScreenBitmap, 0, iHeight, Buffer, &bmi, DIB_RGB_COLORS);
+							SystemParametersInfo(SPI_GETWHEELSCROLLLINES, 0, &Lines, 0);
+							// WHEEL_DELTA(120)
+							WheelUnit		= WHEEL_DELTA / Lines;
 
-                                                    memset(&nbmi, 0, sizeof(nbmi));
-                                                    nbmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-                                                    nbmi.bmiHeader.biWidth = iWidth;
-                                                    nbmi.bmiHeader.biHeight = -iHeight;
-                                                    nbmi.bmiHeader.biPlanes = 1;
-                                                    nbmi.bmiHeader.biBitCount = 32;
-                                                    nbmi.bmiHeader.biCompression = BI_RGB;
+							SumDelta		+= WheelDelta;
+							nScroll			= SumDelta / WheelUnit;
 
-                                                    if(hNewBitmap){ DeleteObject(hNewBitmap); }
-                                                    pRaster = NULL;
-                                                    HBITMAP hNewBitmap = CreateDIBSection(g_hMemDC, &nbmi, DIB_RGB_COLORS, &pRaster, NULL, 0);
-                                                    pBits = (BYTE*)pRaster;
+							// 부호 상관없이 나머지 계산
+							SumDelta		%= WheelUnit;
 
-                                                    int srcStride = ((iWidth * 3) + 3) & ~3;
-                                                    int dstStride = iWidth * 4;
+							int steps		= abs(nScroll);
+							float factor	= 0.1f;
+							if(nScroll > 0){
+								g_Rate = max(1.f, min(5.f, g_Rate + factor * steps));
+							}else{
+								g_Rate = max(1.f, min(5.f, g_Rate - factor * steps));
+							}
+						}
+						break;
 
-                                                    for(int y = 0; y < iHeight; y++){
-                                                        BYTE* src = Buffer + y * srcStride;
-                                                        BYTE* dst = pBits + y * dstStride;
+					case WM_XBUTTONDOWN:
+					case WM_XBUTTONUP:
+						XButton = HIWORD(ptr->mouseData);
+						if(XButton == XBUTTON1){
 
-                                                        for(int x = 0; x < iWidth; x++){
-                                                            BYTE B = src[x * 3 + 0];
-                                                            BYTE G = src[x * 3 + 1];
-                                                            BYTE R = src[x * 3 + 2];
+						}
 
-                                                            dst[x * 4 + 0] = B;
-                                                            dst[x * 4 + 1] = G;
-                                                            dst[x * 4 + 2] = R;
-                                                            dst[x * 4 + 3] = 255;
-                                                        }
-                                                    }
-                                                    delete[] Buffer;
+						if(XButton == XBUTTON2){
 
-                                                    // GetDIBits(g_hMemDC, g_hScreenBitmap, 0, iHeight, PrevBuffer, &bmi, DIB_RGB_COLORS);
-                                                    DebugMessage(L"cmsDoTransform call");
-                                                    cmsDoTransform(Transform, pBits, pBits, PixelCount);        // in-place 가능
-                                                    DebugMessage(L"cmsDoTransform Success");
-                                                    // SetDIBits(g_hMemDC, g_hScreenBitmap, 0, iHeight, Buffer, &bmi, DIB_RGB_COLORS);
-                                                }catch(...){
-                                                    if(PrevBuffer){ delete[] PrevBuffer; }
-                                                    if(Buffer){ delete[] Buffer; }
-                                                    if(hNewBitmap){ DeleteObject(hNewBitmap); }
-                                                    if(Transform){ cmsDeleteTransform(Transform); }
-                                                    if(Monitor){ cmsCloseProfile(Monitor); }
-                                                    if(sRGB){ cmsCloseProfile(sRGB); }
-                                                }
-                                            }
-                                            #endif
+						}
+						break;
 
-                                            SetStretchBltMode(g_hCaptureMemDC, HALFTONE);
-                                            StretchBlt(
-                                                    g_hCaptureMemDC,
-                                                    0, 0, bmp.bmWidth * g_XScale, bmp.bmHeight * g_YScale,
-                                                    g_hMemDC,
-                                                    0, 0, (bmp.bmWidth / g_Rate) * g_XScale, (bmp.bmHeight / g_Rate) * g_YScale,
-                                                    SRCCOPY
-                                                    );
+					default:
+						break;
+				}
+			}
+			InvalidateRect(hWnd, NULL, FALSE);
+			return 0;
 
-                                            SelectObject(g_hCaptureMemDC, hTempOld);
-                                            SelectObject(g_hMemDC, hOld);
-                                            ReleaseDC(hWnd, hdc);
-                                        }
-                                        break;
-
-                                    case 0x34:
-                                        if(GetKeyState(VK_CONTROL) & 0x8000 && GetKeyState(VK_MENU) & 0x8000){
-                                            if(g_hDrawBitmap){
-                                                SendMessage(hControls[nControls-1], LB_INSERTSTRING, 0, (LPARAM)SelectColor);
-                                            }
-                                        }
-                                        break;
-
-                                    default:
-                                        break;
-                                }
-                            }
-                        }
-                        break;
-                }
-            }
-            InvalidateRect(hWnd, NULL, FALSE);
-            return 0;
-
-        case WM_MOUSEHOOK:
-            {
-                MSLLHOOKSTRUCT*ptr = (MSLLHOOKSTRUCT*)lParam;
-                Mouse.x = g_X = (int)(ptr->pt.x);
-                Mouse.y = g_Y = (int)(ptr->pt.y);
-
-                SHORT WheelDelta,
-                      XButton;
-
-                int	Lines		= 0,
-                    nScroll		= 0,
-                    WheelUnit	= 0;
-                static int	SumDelta	= 0;
-
-                switch(wParam){
-                    case WM_MOUSEMOVE:
-                        hCurrentMonitor = MonitorFromPoint(Mouse, MONITOR_DEFAULTTONEAREST);
-
-                        if(g_hCurrentMonitor != hCurrentMonitor){
-                            g_hCurrentMonitor = hCurrentMonitor;
-                            GetRealDpi(g_hCurrentMonitor, &g_XScale, &g_YScale);
-                        }
-                        break;
-
-                    case WM_MOUSEWHEEL:
-                        if(GetKeyState(VK_MENU) & 0x8000){
-                            if(g_hScreenBitmap != NULL){
-                                DeleteObject(g_hScreenBitmap);
-                                g_hScreenBitmap = NULL;
-                            }
-
-                            if(g_hDrawBitmap != NULL){
-                                DeleteObject(g_hDrawBitmap);
-                                g_hDrawBitmap = NULL;
-                            }
-
-                            if(g_hBitmap != NULL){
-                                DeleteObject(g_hBitmap);
-                                g_hBitmap = NULL;
-                            }
-
-                            nScroll			= 0;
-                            WheelDelta		= HIWORD(ptr->mouseData);
-
-                            SystemParametersInfo(SPI_GETWHEELSCROLLLINES, 0, &Lines, 0);
-                            // WHEEL_DELTA(120)
-                            WheelUnit		= WHEEL_DELTA / Lines;
-
-                            SumDelta		+= WheelDelta;
-                            nScroll			= SumDelta / WheelUnit;
-
-                            // 부호 상관없이 나머지 계산
-                            SumDelta		%= WheelUnit;
-
-                            int steps		= abs(nScroll);
-                            float factor	= 0.1f;
-                            if(nScroll > 0){
-                                g_Rate = max(1.f, min(5.f, g_Rate + factor * steps));
-                            }else{
-                                g_Rate = max(1.f, min(5.f, g_Rate - factor * steps));
-                            }
-                        }
-                        break;
-
-                    case WM_XBUTTONDOWN:
-                    case WM_XBUTTONUP:
-                        XButton = HIWORD(ptr->mouseData);
-                        if(XButton == XBUTTON1){
-
-                        }
-
-                        if(XButton == XBUTTON2){
-
-                        }
-                        break;
-
-                    default:
-                        break;
-                }
-            }
-            InvalidateRect(hWnd, NULL, FALSE);
-            return 0;
-
-        case WM_CHANGEFOCUS:
-            {
-                HWND hPrevFocus		= (HWND)lParam;
-                WPARAM KeyCode		= wParam;
+		case WM_CHANGEFOCUS:
+			{
+				HWND hPrevFocus		= (HWND)lParam;
+				WPARAM KeyCode		= wParam;
 
                 // 0 : LShift + Tab
                 // 1 : Tab
@@ -1032,173 +880,165 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
                 }
 
                 SetFocus(hControls[Next]);
-            }
-            return 0;
+			}
+			return 0;
 
-        case WM_DESTROY:
-            KillTimer(hWnd, 1);
-            if(g_hMagnifyCaptureBitmap){ DeleteObject(g_hMagnifyCaptureBitmap); }
-            if(g_hScreenBitmap){ DeleteObject(g_hScreenBitmap); }
-            if(g_hDrawBitmap){ DeleteObject(g_hDrawBitmap); }
-            if(g_hBitmap){ DeleteObject(g_hBitmap); }
-            if(g_hCaptureMemDC){ DeleteDC(g_hCaptureMemDC); }
-            if(g_hScreenMemDC){ DeleteDC(g_hScreenMemDC); }
-            if(g_hDrawMemDC){ DeleteDC(g_hDrawMemDC); }
-            if(g_hMemDC){ DeleteDC(g_hMemDC); }
-            if(g_hMouse){ UnhookWindowsHookEx(g_hMouse); }
-            if(g_hKeyboard){ UnhookWindowsHookEx(g_hKeyboard); }
-            if(g_hModule){ FreeLibrary(g_hModule); }
-            if(OldEditProc){
-                for(int i=0; i<nEdit; i++){
-                    SetClassLongPtr(hControls[i], GCLP_WNDPROC, (LONG_PTR)OldEditProc);
-                }
-            }
-            if(GetProp(hWnd, L"MyEditClassProc") != NULL){
-                RemoveProp(hWnd, L"MyEditClassProc");
-            }
-            if(hRedBrush){ DeleteObject(hRedBrush); }
-            if(hGreenBrush){ DeleteObject(hGreenBrush); }
-            if(hBlueBrush){ DeleteObject(hBlueBrush); }
-            if(hBlackBrush){ DeleteObject(hBlackBrush); }
-            if(hWhitePen){ DeleteObject(hWhitePen); }
-            if(hBlackPen){ DeleteObject(hBlackPen); }
+		case WM_DESTROY:
+			KillTimer(hWnd, 1);
+			if(g_hMagnifyCaptureBitmap){ DeleteObject(g_hMagnifyCaptureBitmap); }
+			if(g_hScreenBitmap){ DeleteObject(g_hScreenBitmap); }
+			if(g_hDrawBitmap){ DeleteObject(g_hDrawBitmap); }
+			if(g_hBitmap){ DeleteObject(g_hBitmap); }
+			if(g_hCaptureMemDC){ DeleteDC(g_hCaptureMemDC); }
+			if(g_hScreenMemDC){ DeleteDC(g_hScreenMemDC); }
+			if(g_hDrawMemDC){ DeleteDC(g_hDrawMemDC); }
+			if(g_hMemDC){ DeleteDC(g_hMemDC); }
+			if(g_hMouse){ UnhookWindowsHookEx(g_hMouse); }
+			if(g_hKeyboard){ UnhookWindowsHookEx(g_hKeyboard); }
+			if(g_hModule){ FreeLibrary(g_hModule); }
+			if(OldEditProc){
+				for(int i=0; i<nEdit; i++){
+					SetClassLongPtr(hControls[i], GCLP_WNDPROC, (LONG_PTR)OldEditProc);
+				}
+			}
+			if(GetProp(hWnd, L"MyEditClassProc") != NULL){
+				RemoveProp(hWnd, L"MyEditClassProc");
+			}
+			if(hRedBrush){ DeleteObject(hRedBrush); }
+			if(hGreenBrush){ DeleteObject(hGreenBrush); }
+			if(hBlueBrush){ DeleteObject(hBlueBrush); }
+			if(hBlackBrush){ DeleteObject(hBlackBrush); }
+			if(hWhitePen){ DeleteObject(hWhitePen); }
+			if(hBlackPen){ DeleteObject(hBlackPen); }
+			PostQuitMessage(0);
+			return 0;
+	}
 
-            if(PrevBuffer){ delete[] PrevBuffer; }
-            if(Buffer){ delete[] Buffer; }
-            if(hNewBitmap){ DeleteObject(hNewBitmap); }
-            if(Transform){ cmsDeleteTransform(Transform); }
-            if(Monitor){ cmsCloseProfile(Monitor); }
-            if(sRGB){ cmsCloseProfile(sRGB); }
-
-            PostQuitMessage(0);
-            return 0;
-    }
-
-    return (DefWindowProc(hWnd, iMessage, wParam, lParam));
+	return (DefWindowProc(hWnd, iMessage, wParam, lParam));
 }
 
 POINT GetWindowCenter(HWND hWnd){
-    RECT wrt;
-    if(hWnd == NULL){ GetWindowRect(GetDesktopWindow(), &wrt); }
-    else{ GetWindowRect(hWnd, &wrt); }
+	RECT wrt;
+	if(hWnd == NULL){ GetWindowRect(GetDesktopWindow(), &wrt); }
+	else{ GetWindowRect(hWnd, &wrt); }
 
-    int iWidth	= wrt.right - wrt.left;
-    int iHeight	= wrt.bottom - wrt.top;
+	int iWidth	= wrt.right - wrt.left;
+	int iHeight	= wrt.bottom - wrt.top;
 
-    iWidth /= 2;
-    iHeight /=2;
+	iWidth /= 2;
+	iHeight /=2;
 
-    POINT Center = {iWidth, iHeight};
+	POINT Center = {iWidth, iHeight};
 
-    return Center;
+	return Center;
 }
 
 BOOL SetWindowCenter(HWND hParent, HWND hWnd, LPRECT lpRect){
-    if(lpRect == NULL){ return FALSE; }
-    if(hWnd != NULL){ GetWindowRect(hWnd, lpRect); }
+	if(lpRect == NULL){ return FALSE; }
+	if(hWnd != NULL){ GetWindowRect(hWnd, lpRect); }
 
-    POINT Center = GetWindowCenter(hParent);
+	POINT Center = GetWindowCenter(hParent);
 
-    int TargetWndWidth	= lpRect->right - lpRect->left;
-    int TargetWndHeight = lpRect->bottom - lpRect->top;
+	int TargetWndWidth	= lpRect->right - lpRect->left;
+	int TargetWndHeight = lpRect->bottom - lpRect->top;
 
-    lpRect->left	= Center.x - (TargetWndWidth / 2);
-    lpRect->top		= Center.y - (TargetWndHeight / 2);
-    lpRect->right	= TargetWndWidth;
-    lpRect->bottom	= TargetWndHeight;
+	lpRect->left	= Center.x - (TargetWndWidth / 2);
+	lpRect->top		= Center.y - (TargetWndHeight / 2);
+	lpRect->right	= TargetWndWidth;
+	lpRect->bottom	= TargetWndHeight;
 
-    return TRUE;
+	return TRUE;
 }
 
 void GetRealDpi(HMONITOR hMonitor, float *XScale, float *YScale){
-    MONITORINFOEX Info = { sizeof(MONITORINFOEX) };
-    GetMonitorInfo(hMonitor, &Info);
+	MONITORINFOEX Info = { sizeof(MONITORINFOEX) };
+	GetMonitorInfo(hMonitor, &Info);
 
-    DEVMODE DevMode = {.dmSize = sizeof(DEVMODE) };
-    EnumDisplaySettings(Info.szDevice, ENUM_CURRENT_SETTINGS, &DevMode);
+	DEVMODE DevMode = {.dmSize = sizeof(DEVMODE) };
+	EnumDisplaySettings(Info.szDevice, ENUM_CURRENT_SETTINGS, &DevMode);
 
-    RECT rt = Info.rcMonitor;
+	RECT rt = Info.rcMonitor;
 
-    float CurrentDpi = GetDpiForSystem() / USER_DEFAULT_SCREEN_DPI;
-    *XScale = CurrentDpi / ((rt.right - rt.left) / (float)DevMode.dmPelsWidth);
-    *YScale = CurrentDpi / ((rt.bottom - rt.top) / (float)DevMode.dmPelsHeight);
+	float CurrentDpi = GetDpiForSystem() / USER_DEFAULT_SCREEN_DPI;
+	*XScale = CurrentDpi / ((rt.right - rt.left) / (float)DevMode.dmPelsWidth);
+	*YScale = CurrentDpi / ((rt.bottom - rt.top) / (float)DevMode.dmPelsHeight);
 }
 
 COLORREF GetAverageColor(HDC hdc, int x, int y, int rad){
-    int	 r  = 0,
-         g	= 0,
-         b	= 0;
+	int	 r  = 0,
+		 g	= 0,
+		 b	= 0;
 
-    int cnt = 0,
-        SampleX[] = {x, x - rad, x + rad},
-        SampleY[] = {y, y - rad, y + rad};
+	int cnt = 0,
+		SampleX[] = {x, x - rad, x + rad},
+		SampleY[] = {y, y - rad, y + rad};
 
-    COLORREF color;
-    for (int i=0; i<3; i++){
-        for (int j=0; j<3; j++){
-            color = GetPixel(hdc, SampleX[i], SampleY[j]);
-            r += GetRValue(color);
-            g += GetGValue(color);
-            b += GetBValue(color);
-            ++cnt;
-        }
-    }
+	COLORREF color;
+	for (int i=0; i<3; i++){
+		for (int j=0; j<3; j++){
+			color = GetPixel(hdc, SampleX[i], SampleY[j]);
+			r += GetRValue(color);
+			g += GetGValue(color);
+			b += GetBValue(color);
+			++cnt;
+		}
+	}
 
-    r /= cnt;
-    g /= cnt;
-    b /= cnt;
+	r /= cnt;
+	g /= cnt;
+	b /= cnt;
 
-    return RGB(r, g, b);
+	return RGB(r, g, b);
 }
 
 // 0.5 미만 == 어두운 계열
 bool IsColorDark(COLORREF color){
-    int  r = GetRValue(color),
-         g = GetGValue(color),
-         b = GetBValue(color);
+	int  r = GetRValue(color),
+		 g = GetGValue(color),
+		 b = GetBValue(color);
 
-    // 가중 평균
-    double brightness = (r * 0.299f + g * 0.587f + b * 0.114f) / 255.f;
+	// 가중 평균
+	double brightness = (r * 0.299f + g * 0.587f + b * 0.114f) / 255.f;
 
-    return brightness < 0.56f;
+	return brightness < 0.56f;
 }
 
 BOOL DrawBitmap(HDC hdc, int x, int y, HBITMAP hBitmap){
-    if(hBitmap == NULL){return FALSE;}
+	if(hBitmap == NULL){return FALSE;}
 
-    BITMAP	bmp;
-    HDC		hMemDC = CreateCompatibleDC(hdc);
-    GetObject(hBitmap, sizeof(BITMAP), &bmp);
+	BITMAP	bmp;
+	HDC		hMemDC = CreateCompatibleDC(hdc);
+	GetObject(hBitmap, sizeof(BITMAP), &bmp);
 
-    HGDIOBJ hOld = SelectObject(hMemDC, hBitmap);
-    BitBlt(hdc, x, y, bmp.bmWidth, bmp.bmHeight, hMemDC, 0,0, SRCCOPY);
+	HGDIOBJ hOld = SelectObject(hMemDC, hBitmap);
+	BitBlt(hdc, x, y, bmp.bmWidth, bmp.bmHeight, hMemDC, 0,0, SRCCOPY);
 
-    SelectObject(hMemDC, hOld);
-    DeleteDC(hMemDC);
+	SelectObject(hMemDC, hOld);
+	DeleteDC(hMemDC);
 
-    return TRUE;
+	return TRUE;
 }
 
 void ErrorMessage(LPCTSTR msg, ...){
-    LPVOID lpMsgBuf;
-    DWORD dw = GetLastError(); 
+	LPVOID lpMsgBuf;
+	DWORD dw = GetLastError(); 
 
-    if (FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, dw, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR) &lpMsgBuf, 0, NULL) == 0) {
-        MessageBox(HWND_DESKTOP, L"DisplayText Error", TEXT("Warning"), MB_OK);
-    }
+	if (FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, dw, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR) &lpMsgBuf, 0, NULL) == 0) {
+		MessageBox(HWND_DESKTOP, L"DisplayText Error", TEXT("Warning"), MB_OK);
+	}
 
-    TCHAR buf[256];
-    StringCbPrintf(buf, sizeof(buf), L"[%s(%d)]%s", msg, dw, lpMsgBuf);
-    MessageBox(HWND_DESKTOP, (LPCTSTR)buf, L"Error", MB_ICONWARNING | MB_OK);
-    LocalFree(lpMsgBuf);
+	TCHAR buf[256];
+	StringCbPrintf(buf, sizeof(buf), L"[%s(%d)]%s", msg, dw, lpMsgBuf);
+	MessageBox(HWND_DESKTOP, (LPCTSTR)buf, L"Error", MB_ICONWARNING | MB_OK);
+	LocalFree(lpMsgBuf);
 }
 
 void ToHexCode(COLORREF color, LPTSTR ret, int Size){
-    StringCbPrintf(ret, Size, L"%02X%02X%02X", GetRValue(color), GetGValue(color), GetBValue(color));
+	StringCbPrintf(ret, Size, L"%02X%02X%02X", GetRValue(color), GetGValue(color), GetBValue(color));
 }
 
 void ToHexCode(int Value, LPTSTR ret, int Size){
-    StringCbPrintf(ret, Size, L"%02X", Value);
+	StringCbPrintf(ret, Size, L"%02X", Value);
 }
 
 void ToHSVCode(float Value, LPTSTR ret, int Size){
@@ -1210,57 +1050,57 @@ void ToHSLCode(float Value, LPTSTR ret, int Size){
 }
 
 COLORREF ToCOLORREF(LPCTSTR HexCode){
-    TCHAR* ptr = (TCHAR*)HexCode;
-    if(ptr[0] == '#'){ ptr++; }
+	TCHAR* ptr = (TCHAR*)HexCode;
+	if(ptr[0] == '#'){ ptr++; }
 
-    int i = 0,
-        r = 0,
-        g = 0,
-        b = 0,
-        Value = 0;
+	int i = 0,
+		r = 0,
+		g = 0,
+		b = 0,
+		Value = 0;
 
-    for(ptr; *ptr && i<6; ptr++){
-        if(*ptr >= '0' && *ptr <= '9'){
-            Value = *ptr -'0';
-        }
-        if(*ptr >= 'A' && *ptr <= 'F'){
-            Value = *ptr -'A' + 10;
-        }
-        if(*ptr >= 'a' && *ptr <= 'f'){
-            Value = *ptr -'a' + 10;
-        }
+	for(ptr; *ptr && i<6; ptr++){
+		if(*ptr >= '0' && *ptr <= '9'){
+			Value = *ptr -'0';
+		}
+		if(*ptr >= 'A' && *ptr <= 'F'){
+			Value = *ptr -'A' + 10;
+		}
+		if(*ptr >= 'a' && *ptr <= 'f'){
+			Value = *ptr -'a' + 10;
+		}
 
-        if(i < 2){
-            r = (r << 4) | Value;
-        }else if(i <4){
-            g = (g << 4) | Value;
-        }else{
-            b = (b << 4) | Value;
-        }
+		if(i < 2){
+			r = (r << 4) | Value;
+		}else if(i <4){
+			g = (g << 4) | Value;
+		}else{
+			b = (b << 4) | Value;
+		}
 
-        i++;
-    }
+		i++;
+	}
 
-    return RGB(r, g, b);
+	return RGB(r, g, b);
 }
 
 MyRGB Normalize(COLORREF color){
-    // 0 ~ 1 : Normalization
+	// 0 ~ 1 : Normalization
 
-    MyRGB rgb;
-    rgb.R = GetRValue(color) / 255.f;
-    rgb.G = GetGValue(color) / 255.f;
-    rgb.B = GetBValue(color) / 255.f;
-    return rgb;
+	MyRGB rgb;
+	rgb.R = GetRValue(color) / 255.f;
+	rgb.G = GetGValue(color) / 255.f;
+	rgb.B = GetBValue(color) / 255.f;
+	return rgb;
 }
 
 MyRGB Normalize(int r, int g, int b){
 
-    MyRGB rgb;
-    rgb.R = max(0.0f, min(1.0f, r / 255.f));
-    rgb.G = max(0.0f, min(1.0f, g / 255.f));
-    rgb.B = max(0.0f, min(1.0f, b / 255.f));
-    return rgb;
+	MyRGB rgb;
+	rgb.R = max(0.0f, min(1.0f, r / 255.f));
+	rgb.G = max(0.0f, min(1.0f, g / 255.f));
+	rgb.B = max(0.0f, min(1.0f, b / 255.f));
+	return rgb;
 }
 
 float LinearToSRGB(float Channel){
@@ -1298,75 +1138,75 @@ MyRGB ConvertToLinearRGB(MyRGB srgb){
 }
 
 LRESULT CALLBACK EditProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam){
-    static CREATESTRUCT* cs;
-    static WNDPROC OldEditProc;
+	static CREATESTRUCT* cs;
+	static WNDPROC OldEditProc;
 
-    if(OldEditProc == NULL){
-        OldEditProc = (WNDPROC)GetProp(GetParent(hWnd), L"MyEditClassProc");
-    }
+	if(OldEditProc == NULL){
+		OldEditProc = (WNDPROC)GetProp(GetParent(hWnd), L"MyEditClassProc");
+	}
 
-    switch(iMessage){
-        case WM_LBUTTONDOWN:
-            SetFocus(hWnd);
-            return 0;
+	switch(iMessage){
+		case WM_LBUTTONDOWN:
+			SetFocus(hWnd);
+			return 0;
 
-        case WM_SETFOCUS:
-            SendMessage(hWnd, EM_SETSEL, 0, -1);
-            break;
+		case WM_SETFOCUS:
+			SendMessage(hWnd, EM_SETSEL, 0, -1);
+			break;
 
-        case WM_CHAR:
-        case WM_KEYUP:
-        case WM_KEYDOWN:
-            {
-                WORD VKCode,
-                     KeyFlags,
-                     ScanCode,
-                     RepeatCount;
+		case WM_CHAR:
+		case WM_KEYUP:
+		case WM_KEYDOWN:
+			{
+				WORD VKCode,
+					 KeyFlags,
+					 ScanCode,
+					 RepeatCount;
 
-                BOOL bExtended,
-                     bWasKeyDown,
-                     bKeyReleased;
+				BOOL bExtended,
+					 bWasKeyDown,
+					 bKeyReleased;
 
-                VKCode		= LOWORD(wParam);
-                KeyFlags	= HIWORD(lParam);
-                ScanCode	= LOBYTE(KeyFlags);
-                bExtended	= ((KeyFlags&& KF_EXTENDED) == KF_EXTENDED);
-                if(bExtended){ ScanCode = MAKEWORD(ScanCode, 0xE0); }
+				VKCode		= LOWORD(wParam);
+				KeyFlags	= HIWORD(lParam);
+				ScanCode	= LOBYTE(KeyFlags);
+				bExtended	= ((KeyFlags&& KF_EXTENDED) == KF_EXTENDED);
+				if(bExtended){ ScanCode = MAKEWORD(ScanCode, 0xE0); }
 
-                bWasKeyDown = ((KeyFlags & KF_REPEAT) == KF_REPEAT);
-                RepeatCount = LOWORD(lParam);
-                bKeyReleased = ((KeyFlags & KF_UP) == KF_UP);
+				bWasKeyDown = ((KeyFlags & KF_REPEAT) == KF_REPEAT);
+				RepeatCount = LOWORD(lParam);
+				bKeyReleased = ((KeyFlags & KF_UP) == KF_UP);
 
-                if(!bKeyReleased){
-                    switch(VKCode){
-                        case VK_UP:
-                        case VK_DOWN:
-                        case VK_TAB:
-                            if(VKCode == VK_TAB){
-                                if(GetKeyState(VK_LSHIFT) & 0x8000){
-                                    SendMessage(GetParent(hWnd), WM_CHANGEFOCUS, (WPARAM)0, (LPARAM)hWnd);
-                                }else{
-                                    SendMessage(GetParent(hWnd), WM_CHANGEFOCUS, (WPARAM)1, (LPARAM)hWnd);
-                                }
-                            }else if(VKCode == VK_UP){
-                                SendMessage(GetParent(hWnd), WM_CHANGEFOCUS, (WPARAM)2, (LPARAM)hWnd);
-                            }else if(VKCode == VK_DOWN){
-                                SendMessage(GetParent(hWnd), WM_CHANGEFOCUS, (WPARAM)3, (LPARAM)hWnd);
-                            }
-                            return 0;
+				if(!bKeyReleased){
+					switch(VKCode){
+						case VK_UP:
+						case VK_DOWN:
+						case VK_TAB:
+							if(VKCode == VK_TAB){
+								if(GetKeyState(VK_LSHIFT) & 0x8000){
+									SendMessage(GetParent(hWnd), WM_CHANGEFOCUS, (WPARAM)0, (LPARAM)hWnd);
+								}else{
+									SendMessage(GetParent(hWnd), WM_CHANGEFOCUS, (WPARAM)1, (LPARAM)hWnd);
+								}
+							}else if(VKCode == VK_UP){
+								SendMessage(GetParent(hWnd), WM_CHANGEFOCUS, (WPARAM)2, (LPARAM)hWnd);
+							}else if(VKCode == VK_DOWN){
+								SendMessage(GetParent(hWnd), WM_CHANGEFOCUS, (WPARAM)3, (LPARAM)hWnd);
+							}
+							return 0;
 
-                        default:
-                            break;
-                    }
-                }
-            }
-            break;
+						default:
+							break;
+					}
+				}
+			}
+			break;
 
-        case WM_CREATE:
-            cs = (CREATESTRUCT*)lParam;
-    }
+		case WM_CREATE:
+			cs = (CREATESTRUCT*)lParam;
+	}
 
-    return CallWindowProc(OldEditProc, hWnd, iMessage, wParam, lParam);
+	return CallWindowProc(OldEditProc, hWnd, iMessage, wParam, lParam);
 }
 
 void DebugMessage(LPCWSTR fmt, ...){
@@ -1386,56 +1226,6 @@ void DebugMessage(LPCWSTR fmt, ...){
     WriteConsole(hOutput, Debug, wcslen(Debug), &dwWritten, NULL);
 }
 
-HBITMAP Convert(HDC hdc, HBITMAP hBitmap, int iWidth, int iHeight){
-    BITMAPINFO bmi = {};
-    bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-    bmi.bmiHeader.biWidth = iWidth;
-    bmi.bmiHeader.biHeight = iHeight;
-    bmi.bmiHeader.biPlanes = 1;
-    bmi.bmiHeader.biBitCount = 24;
-    bmi.bmiHeader.biCompression = BI_RGB;
-
-    GetDIBits(hdc, hBitmap, 0, iHeight, NULL, &bmi, DIB_RGB_COLORS);
-    DWORD dwSize = bmi.bmiHeader.biSizeImage;
-
-    BYTE* Buffer = new BYTE[dwSize];
-    GetDIBits(hdc, hBitmap, 0, iHeight, Buffer, &bmi, DIB_RGB_COLORS);
-
-    BITMAPINFO nbmi = {};
-    nbmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-    nbmi.bmiHeader.biWidth = iWidth;
-    nbmi.bmiHeader.biHeight = -iHeight; // top-down
-    nbmi.bmiHeader.biPlanes = 1;
-    nbmi.bmiHeader.biBitCount = 32;
-    nbmi.bmiHeader.biCompression = BI_RGB;
-
-    void *pRaster = NULL;
-    HBITMAP hNewBitmap = CreateDIBSection(hdc, &nbmi, DIB_RGB_COLORS, &pRaster, NULL, 0);
-    BYTE* ptr = (BYTE*)pRaster;
-
-    int srcStride = ((iWidth * 3) + 3) & ~3;
-    int dstStride = iWidth * 4;
-
-    for(int y = 0; y < iHeight; y++){
-        BYTE* src = Buffer + y * srcStride;
-        BYTE* dst = ptr + y * dstStride;
-
-        for(int x = 0; x < iWidth; x++){
-            BYTE B = src[x * 3 + 0];
-            BYTE G = src[x * 3 + 1];
-            BYTE R = src[x * 3 + 2];
-
-            dst[x * 4 + 0] = B;
-            dst[x * 4 + 1] = G;
-            dst[x * 4 + 2] = R;
-            dst[x * 4 + 3] = 255; // A 채널
-        }
-    }
-
-    delete[] Buffer;
-    return hNewBitmap;
-}
-
 #if (OBSOLETE) 
 MyCMY GetCMY(MyRGB rgb, float K);
 MyCMYK ToCMYK(int r, int g, int b);
@@ -1446,16 +1236,16 @@ HBRUSH CreateCMYKBrush(MyCMYK cmyk);
 void ToHexCode(MyCMYK cmyk, LPTSTR ret, int Size);
 
 typedef struct tag_MyCMY{
-    float C;
-    float M;
-    float Y;
+	float C;
+	float M;
+	float Y;
 }MyCMY;
 
 typedef struct tag_MyCMYK{
-    float C;
-    float M;
-    float Y;
-    float K;
+	float C;
+	float M;
+	float Y;
+	float K;
 }MyCMYK;
 
 float MyGetKValue(MyRGB rgb) {
@@ -1604,6 +1394,7 @@ MyCMYK ToCMYKFromICC(int r, int g, int b){
         cmsHTRANSFORM transform = cmsCreateTransform(rgbProf, TYPE_RGB_8, cmykProf, TYPE_CMYK_8, INTENT_PERCEPTUAL, 0);
 
         if(!transform){
+            // DebugMessage(transform Is Null);
             cmsCloseProfile(rgbProf);
             cmsCloseProfile(cmykProf);
             return ret;
@@ -1626,5 +1417,3 @@ MyCMYK ToCMYKFromICC(int r, int g, int b){
     return ToCMYK(r,g,b);
 }
 #endif
-
-
