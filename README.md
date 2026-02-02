@@ -1,4 +1,4 @@
-![ColorFromPoint 실행 화면](./Images/ColorFromPoint-demo2.gif)
+![ColorFromPoint 실행 화면](./Images/ColorFromPoint-demo3.gif)
 # 📌 ColorFromPoint<br>
 Windows Legacy API와 후킹을 이용한 컬러 픽커입니다.<br>
 이 프로젝트는 MIT 라이선스 하에 제공되어 누구나 자유롭게 사용, 수정, 배포할 수 있습니다. 개인 또는 상업적 용도로도 활용이 가능합니다.<br>
