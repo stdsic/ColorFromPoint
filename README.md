@@ -44,6 +44,9 @@ MyApiDll.dll<br>
 - stdsic — @https://github.com/stdsic/ColorFromPoint<br>
 <br><br>
 ## 📚 Version History<br>
+- 1.1.3<br>
+  - 함수 로직 수정
+  - 불필요한 함수 삭제
 - 1.1.2<br>
   - HSL 색 공간 추가
   - 프로그램 소개글 수정
