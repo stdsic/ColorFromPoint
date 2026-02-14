@@ -70,7 +70,6 @@ LRESULT CALLBACK EditProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam
 
 POINT GetWindowCenter(HWND hWnd);
 BOOL SetWindowCenter(HWND hParent, HWND hWnd, LPRECT lpRect);
-void GetRealDpi(HMONITOR hMonitor, float *XScale, float *YScale);
 COLORREF GetAverageColor(HDC hdc, int x, int y, int rad);
 bool IsColorDark(COLORREF color);
 BOOL DrawBitmap(HDC hdc, int x, int y, HBITMAP hBitmap);
@@ -779,7 +778,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 
 						if(g_hCurrentMonitor != hCurrentMonitor){
 							g_hCurrentMonitor = hCurrentMonitor;
-							GetRealDpi(g_hCurrentMonitor, &g_XScale, &g_YScale);
+							// GetRealDpi(g_hCurrentMonitor, &g_XScale, &g_YScale);
 						}
 						break;
 
@@ -948,20 +947,6 @@ BOOL SetWindowCenter(HWND hParent, HWND hWnd, LPRECT lpRect){
 	lpRect->bottom	= TargetWndHeight;
 
 	return TRUE;
-}
-
-void GetRealDpi(HMONITOR hMonitor, float *XScale, float *YScale){
-	MONITORINFOEX Info = { sizeof(MONITORINFOEX) };
-	GetMonitorInfo(hMonitor, &Info);
-
-	DEVMODE DevMode = {.dmSize = sizeof(DEVMODE) };
-	EnumDisplaySettings(Info.szDevice, ENUM_CURRENT_SETTINGS, &DevMode);
-
-	RECT rt = Info.rcMonitor;
-
-	float CurrentDpi = GetDpiForSystem() / USER_DEFAULT_SCREEN_DPI;
-	*XScale = CurrentDpi / ((rt.right - rt.left) / (float)DevMode.dmPelsWidth);
-	*YScale = CurrentDpi / ((rt.bottom - rt.top) / (float)DevMode.dmPelsHeight);
 }
 
 COLORREF GetAverageColor(HDC hdc, int x, int y, int rad){
@@ -1234,6 +1219,7 @@ MyRGB ToRGB(MyCMYK cmyk);
 COLORREF ToCOLORREF(MyCMYK cmyk);
 HBRUSH CreateCMYKBrush(MyCMYK cmyk);
 void ToHexCode(MyCMYK cmyk, LPTSTR ret, int Size);
+void GetRealDpi(HMONITOR hMonitor, float *XScale, float *YScale);
 
 typedef struct tag_MyCMY{
 	float C;
@@ -1415,5 +1401,17 @@ MyCMYK ToCMYKFromICC(int r, int g, int b){
     }
 
     return ToCMYK(r,g,b);
+}
+
+void GetRealDpi(HMONITOR hMonitor, float *XScale, float *YScale){
+	MONITORINFOEX Info = { sizeof(MONITORINFOEX) };
+	GetMonitorInfo(hMonitor, &Info);
+
+	DEVMODE DevMode = {.dmSize = sizeof(DEVMODE) };
+	EnumDisplaySettings(Info.szDevice, ENUM_CURRENT_SETTINGS, &DevMode);
+
+	RECT rt = Info.rcMonitor;
+	*XScale = ((rt.right - rt.left) / (float)DevMode.dmPelsWidth);
+	*YScale = ((rt.bottom - rt.top) / (float)DevMode.dmPelsHeight);
 }
 #endif
