@@ -24,68 +24,60 @@ public:
 	static const Color Magenta;
 
 public:
-	const Color operator +(const Color& Other) const {
-		return Color(
-				_R + Other._R,
+	const Color operator +(const Color& Other) const 
+    {
+		return Color(_R + Other._R,
 				_G + Other._G,
-				_B + Other._B
-		);
+				_B + Other._B);
 	}
 
-	const Color operator -(const Color& Other) const {
-		return Color(
-				_R - Other._R,
+	const Color operator -(const Color& Other) const 
+    {
+		return Color(_R - Other._R,
 				_G - Other._G,
-				_B - Other._B
-		);
+				_B - Other._B);
 	}
 
-	const Color operator *(const Color& Other) const {
-		return Color(
-				_R * Other._R,
+	const Color operator *(const Color& Other) const
+    {
+		return Color(_R * Other._R,
 				_G * Other._G,
-				_B * Other._B
-		);
+				_B * Other._B);
 	}
 
-	const Color operator /(const Color& Other) const {
-		return Color(
-				_R / Other._R,
+	const Color operator /(const Color& Other) const 
+    {
+		return Color(_R / Other._R,
 				_G / Other._G,
-				_B / Other._B
-		);
+				_B / Other._B);
 	}
 
-	const Color operator +(const float& Value) const {
-		return Color(
-				_R + Value,
+	const Color operator +(const float& Value) const
+    {
+		return Color(_R + Value,
 				_G + Value,
-				_B + Value
-		);
+				_B + Value);
 	}
 
-	const Color operator -(const float& Value) const {
-			return Color(
-				_R - Value,
+	const Color operator -(const float& Value) const
+    {
+			return Color(_R - Value,
 				_G - Value,
-				_B - Value
-		);
+				_B - Value);
 	}
 
-	const Color operator *(const float& Value) const {
-		return Color(
-				_R * Value,
+	const Color operator *(const float& Value) const
+    {
+		return Color(_R * Value,
 				_G * Value,
-				_B * Value
-		);
+				_B * Value);
 	}
 
-	const Color operator /(const float& Value) const {
-		return Color(
-				_R / Value,
+	const Color operator /(const float& Value) const 
+    {
+		return Color(_R / Value,
 				_G / Value,
-				_B / Value
-		);
+				_B / Value);
 	}
 
 public:
@@ -99,7 +91,12 @@ public:
 
 public:
 	Color(float R = 0.f, float G = 0.f, float B = 0.f, BOOL bHSV = FALSE);
-	operator int() { return (int)ToColorRef(); }
+
+	operator int()
+    {
+        return (int)ToColorRef();
+    }
+
 	explicit Color(COLORREF ColorRef);
 	~Color();
 };
