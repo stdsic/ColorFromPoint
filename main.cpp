@@ -1,6 +1,15 @@
 // #define _DEBUG
 #define _WIN32_WINNT 0x0A00
 
+#include "Color.h"
+#include <windows.h>
+#include <winspool.h>
+#include <strsafe.h>
+#include <math.h>
+#include <lcms2.h>      /* LittleCMS */
+#include <icm.h>        /* WCS API  */
+                        /* Mingw 환경에서는 제대로 동작하지 않는다. 최신 버전이 아니라 구조체 정의가 다르고 함수 시그니처가 변경되었다. */
+
 #define CLASS_NAME L"ColorFromPoint"
 #define WM_CHANGEFOCUS WM_USER+1
 
@@ -18,15 +27,6 @@
 #define IDM_LINE 4098
 
 #define OBSOLETE 0
-
-#include "Color.h"
-#include <windows.h>
-#include <winspool.h>
-#include <strsafe.h>
-#include <math.h>
-#include <lcms2.h>      /* LittleCMS */
-#include <icm.h>        /* WCS API  */
-                        /* Mingw 환경에서는 제대로 동작하지 않는다. 최신 버전이 아니라 구조체 정의가 다르고 함수 시그니처가 변경되었다. */
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK EditProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam);
@@ -619,8 +619,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 
 				case IDM_PROGRAM:
 					MessageBox(hWnd, L"프로그램 소개\r\n\r\n이 프로그램은 색상값 조사에 사용되는 컬러 픽커입니다."
-                            "\r\n\r\n마우스 커서를 기준으로 일정한 크기의 영역을 캡처하여\r\n"
-                            "이미지 정보를 가져온 후 값을 추출할 색상 위에\r\n
+                            L"\r\n\r\n마우스 커서를 기준으로 일정한 크기의 영역을 캡처하여\r\n"
+                            "이미지 정보를 가져온 후 값을 추출할 색상 위에\r\n"
                             "마우스 커서를 위치시켜 단축키로 색상을 추출할 수 있습니다.\r\n"
                             "색상 추출은 픽셀 단위로만 가능합니다.\r\n\r\n"
                             "단축키\r\n• Ctrl + Alt + 3 : 마우스 주변 영역을 캡처합니다. \r\n"
@@ -931,21 +931,21 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 								g_hBitmap = NULL;
 							}
 
-							nScroll			= 0;
-							WheelDelta		= HIWORD(ptr->mouseData);
+							nScroll = 0;
+							WheelDelta = HIWORD(ptr->mouseData);
 
 							SystemParametersInfo(SPI_GETWHEELSCROLLLINES, 0, &Lines, 0);
 							// WHEEL_DELTA(120)
-							WheelUnit		= WHEEL_DELTA / Lines;
+							WheelUnit = WHEEL_DELTA / Lines;
 
-							SumDelta		+= WheelDelta;
-							nScroll			= SumDelta / WheelUnit;
+							SumDelta += WheelDelta;
+							nScroll = SumDelta / WheelUnit;
 
 							// 부호 상관없이 나머지 계산
 							SumDelta		%= WheelUnit;
 
-							int steps		= abs(nScroll);
-							float factor	= 0.1f;
+							int steps = abs(nScroll);
+							float factor = 0.1f;
 
 							if (nScroll > 0) 
 								g_Rate = max(1.f, min(5.f, g_Rate + factor * steps));
